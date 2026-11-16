@@ -31,6 +31,9 @@ namespace BattleForYourSoul.Combat
 
         [SerializeField, Min(0f)] private float damage = 1f;
 
+        [Tooltip("Sprite applied to each fired projectile.")]
+        [SerializeField] private Sprite projectileSprite;
+
         public float FireInterval => fireInterval;
         public int ProjectilesPerShot => projectilesPerShot;
         public float SpreadDegrees => spreadDegrees;
@@ -38,5 +41,6 @@ namespace BattleForYourSoul.Combat
         public float ProjectileSpeed => projectileSpeed;
         public float ProjectileLifetime => projectileLifetime;
         public float Damage => damage;
+        public Sprite ProjectileSprite => projectileSprite;
     }
 }
