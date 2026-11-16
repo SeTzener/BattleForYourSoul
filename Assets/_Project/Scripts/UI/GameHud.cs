@@ -47,7 +47,7 @@ namespace BattleForYourSoul.UI
             if (levelDirector != null)
             {
                 levelDirector.LevelChanged += HandleStageChanged;
-                HandleStageChanged(levelDirector.CurrentLevel);
+                HandleStageChanged(levelDirector.StageNumber);
             }
         }
 
