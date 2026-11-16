@@ -23,9 +23,13 @@ namespace BattleForYourSoul.Enemies
         private Rigidbody2D _body;
         private Transform _target;
         private EnemyRegistry _registry;
+        private EnemyDefinition _definition;
         private Action<Enemy> _release;
         private float _moveSpeed;
         private bool _active;
+
+        /// <summary>XP this enemy is worth when killed. Zero when no definition drives it.</summary>
+        public float XpReward => _definition != null ? _definition.XpReward : 0f;
 
         private void Awake()
         {
@@ -65,6 +69,7 @@ namespace BattleForYourSoul.Enemies
         /// <summary>Resets per-spawn state. Called right after the pool hands this enemy out.</summary>
         public void Initialize(EnemyDefinition definition, Transform target, EnemyRegistry registry)
         {
+            _definition = definition;
             _target = target;
             _registry = registry;
             _active = true;

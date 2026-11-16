@@ -21,6 +21,10 @@ namespace BattleForYourSoul.Enemies
         [SerializeField, Min(0f)] private float contactDamage = 6f;
         [SerializeField, Min(0.05f)] private float contactDamageInterval = 0.85f;
 
+        [Header("Reward")]
+        [Tooltip("XP dropped when this enemy dies.")]
+        [SerializeField, Min(0f)] private float xpReward = 1f;
+
         [Header("Body")]
         [SerializeField, Min(0.05f)] private float colliderRadius = 0.28f;
 
@@ -30,6 +34,7 @@ namespace BattleForYourSoul.Enemies
         public float MoveSpeed => moveSpeed;
         public float ContactDamage => contactDamage;
         public float ContactDamageInterval => contactDamageInterval;
+        public float XpReward => xpReward;
         public float ColliderRadius => colliderRadius;
     }
 }
