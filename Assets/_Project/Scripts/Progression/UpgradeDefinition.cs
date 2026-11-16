@@ -17,7 +17,6 @@ namespace BattleForYourSoul.Progression
         ProjectileSpeedPercent,
         MaxHealthFlat,
         ExtraProjectiles,
-        PickupRadiusPercent,
     }
 
     /// <summary>One additive modifier inside an upgrade, applied on top of everything before it.</summary>

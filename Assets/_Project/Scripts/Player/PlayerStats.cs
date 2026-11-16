@@ -28,10 +28,6 @@ namespace BattleForYourSoul.Player
         private float _moveSpeedMultiplier = 1f;
         private float _projectileSpeedMultiplier = 1f;
         private int _extraProjectiles;
-        private float _pickupRadiusMultiplier = 1f;
-
-        /// <summary>Multiplier applied to pickup magnet radii. Read when a pickup is spawned.</summary>
-        public float PickupRadiusMultiplier => _pickupRadiusMultiplier;
 
         private void Awake()
         {
@@ -84,9 +80,6 @@ namespace BattleForYourSoul.Player
                     break;
                 case UpgradeStat.ExtraProjectiles:
                     _extraProjectiles += Mathf.RoundToInt(modifier.Value);
-                    break;
-                case UpgradeStat.PickupRadiusPercent:
-                    _pickupRadiusMultiplier *= 1f + modifier.Value * 0.01f;
                     break;
             }
         }
