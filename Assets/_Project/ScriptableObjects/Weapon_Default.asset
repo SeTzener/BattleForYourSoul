@@ -19,3 +19,4 @@ MonoBehaviour:
   projectileSpeed: 14
   projectileLifetime: 1.1
   damage: 1
+  projectileSprite: {fileID: 21300000, guid: 47593eb26ee584b288384a1c9755508f, type: 3}

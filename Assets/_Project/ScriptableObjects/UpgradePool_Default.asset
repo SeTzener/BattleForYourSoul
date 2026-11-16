@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 656a6bb9238634222ba37a364425b6e9, type: 3}
+  m_Name: UpgradePool_Default
+  m_EditorClassIdentifier: BattleForYourSoul::BattleForYourSoul.Progression.UpgradePool
+  upgrades:
+  - {fileID: 11400000, guid: 6bf9b0d25af7f403f92dd246938c0eb4, type: 2}
+  - {fileID: 11400000, guid: 87db78e5141ab465c889a55212182936, type: 2}
+  - {fileID: 11400000, guid: c4a818b674efa409e82e6ff0dfc9646e, type: 2}
+  - {fileID: 11400000, guid: 4eb0d67ca5289452d80b53196161142b, type: 2}
+  - {fileID: 11400000, guid: 90a3a4c09165645219fbfab395c066a3, type: 2}
+  - {fileID: 11400000, guid: c7d588e9f8781460a81ef04cedf80c62, type: 2}
