@@ -16,6 +16,9 @@ namespace BattleForYourSoul.Combat
         [Tooltip("Radius used to nudge the projectile away from its muzzle when it spawns.")]
         [SerializeField, Min(0f)] private float spawnRadius = 0.2f;
 
+        [Tooltip("Renderer the firing weapon's projectile sprite is applied to.")]
+        [SerializeField] private SpriteRenderer spriteRenderer;
+
         private Rigidbody2D _body;
         private Action<Projectile> _release;
         private GameObject _owner;
@@ -26,12 +29,25 @@ namespace BattleForYourSoul.Combat
         private void Awake()
         {
             _body = GetComponent<Rigidbody2D>();
+            if (spriteRenderer == null)
+            {
+                spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+            }
         }
 
         /// <summary>Injected by the owning pool so the projectile can return itself.</summary>
         public void SetReleaseCallback(Action<Projectile> release)
         {
             _release = release;
+        }
+
+        /// <summary>Applies the firing weapon's projectile sprite. Called before <see cref="Launch"/>.</summary>
+        public void SetSprite(Sprite sprite)
+        {
+            if (spriteRenderer != null && sprite != null)
+            {
+                spriteRenderer.sprite = sprite;
+            }
         }
 
         /// <summary>

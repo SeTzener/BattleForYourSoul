@@ -9,6 +9,7 @@ namespace BattleForYourSoul.Player
     [RequireComponent(typeof(SpriteRenderer))]
     public sealed class PlayerVisuals : MonoBehaviour
     {
+        [SerializeField] private PlayerDefinition definition;
         [SerializeField] private PlayerMovement movement;
         [SerializeField] private SpriteRenderer spriteRenderer;
 
@@ -28,6 +29,11 @@ namespace BattleForYourSoul.Player
             if (spriteRenderer == null)
             {
                 spriteRenderer = GetComponent<SpriteRenderer>();
+            }
+
+            if (definition != null && definition.Sprite != null && spriteRenderer != null)
+            {
+                spriteRenderer.sprite = definition.Sprite;
             }
         }
 
