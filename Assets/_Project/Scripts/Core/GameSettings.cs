@@ -33,11 +33,15 @@ namespace BattleForYourSoul.Core
         [Tooltip("Sorting layer for characters and props, sorted by world Y.")]
         [SerializeField] private string entitySortingLayer = "Entities";
 
+        [Tooltip("Sorting layer drawn in front of entities (projectiles, hit effects).")]
+        [SerializeField] private string vfxSortingLayer = "VFX";
+
         public int PixelsPerUnit => pixelsPerUnit;
         public Vector2Int ReferenceResolution => referenceResolution;
         public float IsometricRatio => isometricRatio;
         public Vector2Int TileSizeInPixels => tileSizeInPixels;
         public string GroundSortingLayer => groundSortingLayer;
         public string EntitySortingLayer => entitySortingLayer;
+        public string VfxSortingLayer => vfxSortingLayer;
     }
 }
