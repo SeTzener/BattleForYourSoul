@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using BattleForYourSoul.Infrastructure;
+using BattleForYourSoul.Progression;
 
 namespace BattleForYourSoul.Enemies
 {
@@ -17,6 +18,7 @@ namespace BattleForYourSoul.Enemies
         [SerializeField] private Enemy enemyPrefab;
         [SerializeField] private EnemyDefinition definition;
         [SerializeField] private EnemyRegistry registry;
+        [SerializeField] private LevelDirector levelDirector;
         [SerializeField] private Transform target;
 
         [Header("Spawning")]
@@ -88,7 +90,10 @@ namespace BattleForYourSoul.Enemies
         {
             Enemy enemy = _pool.Get();
             enemy.transform.position = PickSpawnPosition();
-            enemy.Initialize(definition, target, registry);
+
+            int level = levelDirector != null ? levelDirector.CurrentLevel : 1;
+            MonsterScaling scaling = levelDirector != null ? levelDirector.Scaling : null;
+            enemy.Initialize(definition, level, scaling, target, registry);
         }
 
         private Vector2 PickSpawnPosition()

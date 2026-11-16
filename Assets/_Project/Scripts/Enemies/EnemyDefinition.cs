@@ -22,7 +22,7 @@ namespace BattleForYourSoul.Enemies
         [SerializeField, Min(0.05f)] private float contactDamageInterval = 0.85f;
 
         [Header("Reward")]
-        [Tooltip("XP dropped when this enemy dies.")]
+        [Tooltip("Base XP at monster level 1. Scaled up by the monster level (see MonsterScaling).")]
         [SerializeField, Min(0f)] private float xpReward = 1f;
 
         [Header("Body")]
