@@ -30,10 +30,13 @@ namespace BattleForYourSoul.EditorTools
 
             EnsureFolder("Assets/_Project/Art/Environment");
             EnsureFolder("Assets/_Project/Art/Characters");
+            EnsureFolder("Assets/_Project/Art/VFX");
 
             GenerateFloorTiles();
             GeneratePlayer();
             GenerateRock();
+            GenerateEnemyGrunt();
+            GenerateProjectileBolt();
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -148,6 +151,94 @@ namespace BattleForYourSoul.EditorTools
             FillEllipse(px, w, h, 11, 14, 6, 4, rockLight);
 
             WriteSprite("Assets/_Project/Art/Environment/Prop_Rock.png", px, w, h, SpriteAlignment.BottomCenter);
+        }
+
+        private static void GenerateEnemyGrunt()
+        {
+            const int w = 16;
+            const int h = 16;
+
+            var px = new Color32[w * h];
+            for (int i = 0; i < px.Length; i++)
+            {
+                px[i] = Clear;
+            }
+
+            var body = new Color32(112, 72, 138, 255);
+            var bodyDark = new Color32(78, 48, 102, 255);
+            var belly = new Color32(154, 112, 182, 255);
+            var eye = new Color32(244, 244, 248, 255);
+            var pupil = new Color32(28, 18, 40, 255);
+            var horn = new Color32(222, 214, 190, 255);
+            var foot = new Color32(58, 36, 76, 255);
+
+            // Feet (origin is bottom-left, so feet sit on y = 0).
+            FillRect(px, w, h, 3, 0, 4, 2, foot);
+            FillRect(px, w, h, 9, 0, 4, 2, foot);
+
+            // Body and belly.
+            FillEllipse(px, w, h, 8, 6, 6, 5, body);
+            FillEllipse(px, w, h, 8, 5, 4, 3, belly);
+            FillEllipse(px, w, h, 8, 3, 6, 2, bodyDark);
+
+            // Horns.
+            FillRect(px, w, h, 3, 10, 2, 3, horn);
+            FillRect(px, w, h, 11, 10, 2, 3, horn);
+
+            // Eyes.
+            FillRect(px, w, h, 4, 7, 3, 3, eye);
+            FillRect(px, w, h, 9, 7, 3, 3, eye);
+            FillRect(px, w, h, 5, 7, 1, 2, pupil);
+            FillRect(px, w, h, 10, 7, 1, 2, pupil);
+
+            WriteSprite("Assets/_Project/Art/Characters/Enemy_Grunt.png", px, w, h, SpriteAlignment.BottomCenter);
+        }
+
+        private static void GenerateProjectileBolt()
+        {
+            const int w = 8;
+            const int h = 8;
+
+            var px = new Color32[w * h];
+            for (int i = 0; i < px.Length; i++)
+            {
+                px[i] = Clear;
+            }
+
+            var glow = new Color32(122, 190, 255, 150);
+            var glowEdge = new Color32(86, 150, 236, 90);
+            var core = new Color32(232, 250, 255, 255);
+
+            FillDiamond(px, w, h, 4, 4, 4, 4, glowEdge);
+            FillDiamond(px, w, h, 4, 4, 3, 3, glow);
+            FillDiamond(px, w, h, 4, 4, 1, 2, core);
+
+            WriteSprite("Assets/_Project/Art/VFX/Projectile_Bolt.png", px, w, h, SpriteAlignment.Center);
+        }
+
+        private static void FillDiamond(Color32[] px, int w, int h, int cx, int cy, int rx, int ry, Color32 color)
+        {
+            for (int y = cy - ry; y <= cy + ry; y++)
+            {
+                if (y < 0 || y >= h)
+                {
+                    continue;
+                }
+
+                for (int x = cx - rx; x <= cx + rx; x++)
+                {
+                    if (x < 0 || x >= w)
+                    {
+                        continue;
+                    }
+
+                    float d = Mathf.Abs(x + 0.5f - cx) / rx + Mathf.Abs(y + 0.5f - cy) / ry;
+                    if (d <= 1f)
+                    {
+                        px[y * w + x] = color;
+                    }
+                }
+            }
         }
 
         private static void FillRect(Color32[] px, int w, int h, int x0, int y0, int rw, int rh, Color32 color)
