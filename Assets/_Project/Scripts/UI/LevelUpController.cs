@@ -24,7 +24,7 @@ namespace BattleForYourSoul.UI
         [SerializeField] private Health playerHealth;
         [SerializeField] private GameObject panel;
         [SerializeField] private UpgradeCardView[] cards;
-        [SerializeField] private UpgradeDefinition[] upgrades;
+        [SerializeField] private UpgradePool pool;
 
         private readonly List<UpgradeDefinition> _choices = new List<UpgradeDefinition>();
         private readonly List<UpgradeDefinition> _scratch = new List<UpgradeDefinition>();
@@ -178,16 +178,17 @@ namespace BattleForYourSoul.UI
             _choices.Clear();
             _scratch.Clear();
 
-            if (upgrades == null)
+            if (pool == null)
             {
                 return;
             }
 
-            for (int i = 0; i < upgrades.Length; i++)
+            for (int i = 0; i < pool.Count; i++)
             {
-                if (upgrades[i] != null)
+                UpgradeDefinition upgrade = pool.Get(i);
+                if (upgrade != null)
                 {
-                    _scratch.Add(upgrades[i]);
+                    _scratch.Add(upgrade);
                 }
             }
 
