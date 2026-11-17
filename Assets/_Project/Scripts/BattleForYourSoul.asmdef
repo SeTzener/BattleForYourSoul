@@ -2,7 +2,8 @@
     "name": "BattleForYourSoul",
     "rootNamespace": "BattleForYourSoul",
     "references": [
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
