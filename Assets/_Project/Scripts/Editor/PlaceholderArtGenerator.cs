@@ -38,7 +38,6 @@ namespace BattleForYourSoul.EditorTools
             GenerateRock();
             GenerateEnemyGrunt();
             GenerateProjectileBolt();
-            GenerateXpGem();
             GenerateUpgradeIcon();
 
             AssetDatabase.SaveAssets();
@@ -217,28 +216,6 @@ namespace BattleForYourSoul.EditorTools
             FillDiamond(px, w, h, 4, 4, 1, 2, core);
 
             WriteSprite("Assets/_Project/Art/VFX/Projectile_Bolt.png", px, w, h, SpriteAlignment.Center);
-        }
-
-        private static void GenerateXpGem()
-        {
-            const int w = 8;
-            const int h = 8;
-
-            var px = new Color32[w * h];
-            for (int i = 0; i < px.Length; i++)
-            {
-                px[i] = Clear;
-            }
-
-            var edge = new Color32(28, 128, 96, 255);
-            var body = new Color32(64, 214, 158, 255);
-            var shine = new Color32(198, 255, 232, 255);
-
-            FillDiamond(px, w, h, 4, 4, 4, 4, edge);
-            FillDiamond(px, w, h, 4, 4, 3, 3, body);
-            FillRect(px, w, h, 3, 4, 2, 2, shine);
-
-            WriteSprite("Assets/_Project/Art/VFX/Xp_Gem.png", px, w, h, SpriteAlignment.Center);
         }
 
         private static void GenerateUpgradeIcon()

@@ -9,7 +9,6 @@ using UnityEngine.UI;
 using BattleForYourSoul.Combat;
 using BattleForYourSoul.Core;
 using BattleForYourSoul.Enemies;
-using BattleForYourSoul.Pickups;
 using BattleForYourSoul.Player;
 using BattleForYourSoul.Progression;
 using BattleForYourSoul.UI;
@@ -20,7 +19,7 @@ namespace BattleForYourSoul.EditorTools
     /// <summary>
     /// Builds the isometric test scene from scratch: settings asset, prefabs, definitions, isometric
     /// grid, ground tilemap, obstacles, collision walls, pixel-perfect camera, 2D light, the combat
-    /// loop (enemy registry, spawner, player weapon) and the HUD.
+    /// loop (enemy registry, spawner, player weapon), the stage/XP progression and the HUD.
     ///
     /// This is authoring tooling, not gameplay. Re-running it regenerates the scene deterministically.
     /// Runtime wiring that depends on C# events is NOT done here (event subscriptions do not
@@ -39,8 +38,8 @@ namespace BattleForYourSoul.EditorTools
         private const string WeaponDefinitionPath = "Assets/_Project/ScriptableObjects/Weapon_Default.asset";
         private const string EnemyDefinitionPath = "Assets/_Project/ScriptableObjects/Enemy_Grunt.asset";
         private const string ProgressionDefinitionPath = "Assets/_Project/ScriptableObjects/Progression_Default.asset";
+        private const string MonsterScalingPath = "Assets/_Project/ScriptableObjects/MonsterScaling_Default.asset";
         private const string UpgradesFolder = "Assets/_Project/ScriptableObjects/Upgrades";
-        private const string XpGemPrefabPath = "Assets/_Project/Prefabs/XpGem.prefab";
 
         private const string FloorTileAPath = "Assets/_Project/Art/Environment/Tile_Floor_A.png";
         private const string FloorTileBPath = "Assets/_Project/Art/Environment/Tile_Floor_B.png";
@@ -48,7 +47,6 @@ namespace BattleForYourSoul.EditorTools
         private const string PlayerSpritePath = "Assets/_Project/Art/Characters/Player.png";
         private const string EnemySpritePath = "Assets/_Project/Art/Characters/Enemy_Grunt.png";
         private const string ProjectileSpritePath = "Assets/_Project/Art/VFX/Projectile_Bolt.png";
-        private const string XpGemSpritePath = "Assets/_Project/Art/VFX/Xp_Gem.png";
         private const string UpgradeIconSpritePath = "Assets/_Project/Art/UI/Upgrade_Icon.png";
 
         private const int GroundRadiusInCells = 8;
@@ -68,10 +66,10 @@ namespace BattleForYourSoul.EditorTools
             EnemyDefinition enemyDefinition = EnsureEnemyDefinition();
             WeaponDefinition weaponDefinition = EnsureWeaponDefinition();
             ProgressionDefinition progression = EnsureProgressionDefinition();
+            MonsterScaling scaling = EnsureMonsterScaling();
             UpgradeDefinition[] upgrades = EnsureUpgrades();
             GameObject enemyPrefab = EnsureEnemyPrefab(settings, enemyDefinition);
             GameObject projectilePrefab = EnsureProjectilePrefab(settings);
-            GameObject xpGemPrefab = EnsureXpGemPrefab(settings);
 
             TileBase floorA = EnsureTile("Tile_Floor_A", FloorTileAPath);
             TileBase floorB = EnsureTile("Tile_Floor_B", FloorTileBPath);
@@ -87,11 +85,11 @@ namespace BattleForYourSoul.EditorTools
             player.transform.position = Vector3.zero;
 
             EnemySpawner spawner = BuildCombat(player, weaponDefinition, enemyDefinition, enemyPrefab, projectilePrefab);
-            Experience experience = BuildProgression(player, spawner, xpGemPrefab, progression);
+            (Experience experience, LevelDirector levelDirector) = BuildProgression(player, spawner, scaling, progression);
 
             BuildCamera(player.transform, settings);
             BuildLight();
-            BuildHud(player, spawner, experience, upgrades);
+            BuildHud(player, spawner, experience, levelDirector, upgrades);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, GameScenePath);
@@ -266,6 +264,20 @@ namespace BattleForYourSoul.EditorTools
             return progression;
         }
 
+        private static MonsterScaling EnsureMonsterScaling()
+        {
+            var scaling = AssetDatabase.LoadAssetAtPath<MonsterScaling>(MonsterScalingPath);
+            if (scaling == null)
+            {
+                scaling = ScriptableObject.CreateInstance<MonsterScaling>();
+                AssetDatabase.CreateAsset(scaling, MonsterScalingPath);
+            }
+
+            EditorUtility.SetDirty(scaling);
+            AssetDatabase.SaveAssets();
+            return scaling;
+        }
+
         private static UpgradeDefinition[] EnsureUpgrades()
         {
             EnsureFolder(UpgradesFolder);
@@ -279,7 +291,6 @@ namespace BattleForYourSoul.EditorTools
                 EnsureUpgrade("Upgrade_Vitality", "vitality", "Vitality", "Gain 20 max health.", new Color32(240, 120, 168, 255), icon, UpgradeStat.MaxHealthFlat, 20f),
                 EnsureUpgrade("Upgrade_SplitShot", "split-shot", "Split Shot", "Fire one extra projectile.", new Color32(178, 130, 240, 255), icon, UpgradeStat.ExtraProjectiles, 1f),
                 EnsureUpgrade("Upgrade_Velocity", "velocity", "Velocity", "Projectiles travel 15% faster.", new Color32(120, 210, 240, 255), icon, UpgradeStat.ProjectileSpeedPercent, 15f),
-                EnsureUpgrade("Upgrade_Magnet", "magnet", "Magnet", "Pick up XP from 25% further.", new Color32(232, 216, 96, 255), icon, UpgradeStat.PickupRadiusPercent, 25f),
             };
         }
 
@@ -310,27 +321,6 @@ namespace BattleForYourSoul.EditorTools
             EditorUtility.SetDirty(upgrade);
             AssetDatabase.SaveAssets();
             return upgrade;
-        }
-
-        private static GameObject EnsureXpGemPrefab(GameSettings settings)
-        {
-            if (AssetDatabase.LoadAssetAtPath<GameObject>(XpGemPrefabPath) != null)
-            {
-                AssetDatabase.DeleteAsset(XpGemPrefabPath);
-            }
-
-            var gem = new GameObject("XpGem");
-
-            var spriteRenderer = gem.AddComponent<SpriteRenderer>();
-            spriteRenderer.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(XpGemSpritePath);
-            spriteRenderer.sortingLayerName = settings.VfxSortingLayer;
-            spriteRenderer.sortingOrder = 0;
-
-            gem.AddComponent<XpGem>();
-
-            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(gem, XpGemPrefabPath);
-            Object.DestroyImmediate(gem);
-            return prefab;
         }
 
         private static void EnsureFolder(string path)
@@ -468,7 +458,7 @@ namespace BattleForYourSoul.EditorTools
             return spawner;
         }
 
-        private static Experience BuildProgression(GameObject player, EnemySpawner spawner, GameObject xpGemPrefab, ProgressionDefinition progression)
+        private static (Experience, LevelDirector) BuildProgression(GameObject player, EnemySpawner spawner, MonsterScaling scaling, ProgressionDefinition progression)
         {
             var experience = player.AddComponent<Experience>();
             SetSerializedReference(experience, "progression", progression);
@@ -478,18 +468,23 @@ namespace BattleForYourSoul.EditorTools
             SetSerializedReference(stats, "weapon", player.GetComponent<WeaponController>());
             SetSerializedReference(stats, "movement", player.GetComponent<PlayerMovement>());
 
-            var dropsGo = new GameObject("Pickup Drops");
-            var drops = dropsGo.AddComponent<XpDropController>();
-            SetSerializedReference(drops, "gemPrefab", xpGemPrefab.GetComponent<XpGem>());
-            SetSerializedReference(drops, "spawner", spawner);
-            SetSerializedReference(drops, "experience", experience);
-            SetSerializedReference(drops, "target", player.transform);
-            SetSerializedReference(drops, "playerStats", stats);
+            // The stage owns the monster level and feeds it to the spawner; the spawner in turn counts
+            // kills for it. Both references are assigned here because the objects are created together.
+            var directorGo = new GameObject("Level Director");
+            var director = directorGo.AddComponent<LevelDirector>();
+            SetSerializedReference(director, "spawner", spawner);
+            SetSerializedReference(director, "scaling", scaling);
+            SetSerializedReference(spawner, "levelDirector", director);
 
-            return experience;
+            var granterGo = new GameObject("Kill XP Granter");
+            var granter = granterGo.AddComponent<KillXpGranter>();
+            SetSerializedReference(granter, "spawner", spawner);
+            SetSerializedReference(granter, "experience", experience);
+
+            return (experience, director);
         }
 
-        private static void BuildHud(GameObject player, EnemySpawner spawner, Experience experience, UpgradeDefinition[] upgrades)
+        private static void BuildHud(GameObject player, EnemySpawner spawner, Experience experience, LevelDirector levelDirector, UpgradeDefinition[] upgrades)
         {
             var canvasGo = new GameObject("HUD", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = canvasGo.GetComponent<Canvas>();
@@ -534,6 +529,17 @@ namespace BattleForYourSoul.EditorTools
             killRect.sizeDelta = new Vector2(360f, 48f);
             killLabel.fontSize = 36;
             killLabel.color = new Color32(236, 236, 244, 255);
+
+            // Stage indicator, centered at the top so it reads separately from kills and health.
+            Text stageLabel = CreateText("StageLabel", canvasGo.transform, font, "Stage 1", TextAnchor.UpperCenter);
+            RectTransform stageRect = stageLabel.rectTransform;
+            stageRect.anchorMin = new Vector2(0.5f, 1f);
+            stageRect.anchorMax = new Vector2(0.5f, 1f);
+            stageRect.pivot = new Vector2(0.5f, 1f);
+            stageRect.anchoredPosition = new Vector2(0f, -20f);
+            stageRect.sizeDelta = new Vector2(400f, 48f);
+            stageLabel.fontSize = 36;
+            stageLabel.color = new Color32(232, 216, 96, 255);
 
             // XP bar along the bottom, with the current level above it.
             Image xpBackground = CreateImage("XpBar", canvasGo.transform, new Color32(18, 16, 26, 220));
@@ -633,6 +639,8 @@ namespace BattleForYourSoul.EditorTools
             SetSerializedReference(hud, "experience", experience);
             SetSerializedReference(hud, "xpFill", xpFill);
             SetSerializedReference(hud, "levelLabel", levelLabel);
+            SetSerializedReference(hud, "levelDirector", levelDirector);
+            SetSerializedReference(hud, "stageLabel", stageLabel);
 
             var gameOver = canvasGo.AddComponent<GameOverController>();
             SetSerializedReference(gameOver, "panel", panel.gameObject);

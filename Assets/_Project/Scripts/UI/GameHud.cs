@@ -7,9 +7,9 @@ using BattleForYourSoul.Progression;
 namespace BattleForYourSoul.UI
 {
     /// <summary>
-    /// Minimal run HUD: a player health bar, an XP bar with the current level, and a kill counter. It
-    /// only reflects state pushed by <see cref="Health"/>, <see cref="Experience"/> and
-    /// <see cref="EnemySpawner"/> events; it never polls or searches.
+    /// Minimal run HUD: a player health bar, an XP bar with the current level, a stage indicator and
+    /// a kill counter. It only reflects state pushed by <see cref="Health"/>, <see cref="Experience"/>,
+    /// <see cref="LevelDirector"/> and <see cref="EnemySpawner"/> events; it never polls or searches.
     /// </summary>
     public sealed class GameHud : MonoBehaviour
     {
@@ -21,6 +21,8 @@ namespace BattleForYourSoul.UI
         [SerializeField] private Experience experience;
         [SerializeField] private Image xpFill;
         [SerializeField] private Text levelLabel;
+        [SerializeField] private LevelDirector levelDirector;
+        [SerializeField] private Text stageLabel;
 
         private void OnEnable()
         {
@@ -41,6 +43,12 @@ namespace BattleForYourSoul.UI
                 experience.Changed += HandleExperienceChanged;
                 HandleExperienceChanged(experience);
             }
+
+            if (levelDirector != null)
+            {
+                levelDirector.LevelChanged += HandleStageChanged;
+                HandleStageChanged(levelDirector.CurrentLevel);
+            }
         }
 
         private void OnDisable()
@@ -58,6 +66,11 @@ namespace BattleForYourSoul.UI
             if (experience != null)
             {
                 experience.Changed -= HandleExperienceChanged;
+            }
+
+            if (levelDirector != null)
+            {
+                levelDirector.LevelChanged -= HandleStageChanged;
             }
         }
 
@@ -87,6 +100,14 @@ namespace BattleForYourSoul.UI
             if (levelLabel != null)
             {
                 levelLabel.text = $"Lv {value.Level}";
+            }
+        }
+
+        private void HandleStageChanged(int stage)
+        {
+            if (stageLabel != null)
+            {
+                stageLabel.text = $"Stage {stage}";
             }
         }
     }
