@@ -31,12 +31,14 @@ namespace BattleForYourSoul.EditorTools
             EnsureFolder("Assets/_Project/Art/Environment");
             EnsureFolder("Assets/_Project/Art/Characters");
             EnsureFolder("Assets/_Project/Art/VFX");
+            EnsureFolder("Assets/_Project/Art/UI");
 
             GenerateFloorTiles();
             GeneratePlayer();
             GenerateRock();
             GenerateEnemyGrunt();
             GenerateProjectileBolt();
+            GenerateUpgradeIcon();
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -214,6 +216,28 @@ namespace BattleForYourSoul.EditorTools
             FillDiamond(px, w, h, 4, 4, 1, 2, core);
 
             WriteSprite("Assets/_Project/Art/VFX/Projectile_Bolt.png", px, w, h, SpriteAlignment.Center);
+        }
+
+        private static void GenerateUpgradeIcon()
+        {
+            const int w = 16;
+            const int h = 16;
+
+            var px = new Color32[w * h];
+            for (int i = 0; i < px.Length; i++)
+            {
+                px[i] = Clear;
+            }
+
+            // A plain white rune so the level-up card can tint it per upgrade.
+            var white = new Color32(255, 255, 255, 255);
+
+            FillDiamond(px, w, h, 8, 8, 7, 7, white);
+            FillDiamond(px, w, h, 8, 8, 5, 5, Clear);
+            FillRect(px, w, h, 7, 4, 2, 8, white);
+            FillRect(px, w, h, 4, 7, 8, 2, white);
+
+            WriteSprite("Assets/_Project/Art/UI/Upgrade_Icon.png", px, w, h, SpriteAlignment.Center);
         }
 
         private static void FillDiamond(Color32[] px, int w, int h, int cx, int cy, int rx, int ry, Color32 color)

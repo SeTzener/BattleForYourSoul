@@ -10,6 +10,7 @@ using BattleForYourSoul.Combat;
 using BattleForYourSoul.Core;
 using BattleForYourSoul.Enemies;
 using BattleForYourSoul.Player;
+using BattleForYourSoul.Progression;
 using BattleForYourSoul.UI;
 using BattleForYourSoul.World;
 
@@ -18,7 +19,7 @@ namespace BattleForYourSoul.EditorTools
     /// <summary>
     /// Builds the isometric test scene from scratch: settings asset, prefabs, definitions, isometric
     /// grid, ground tilemap, obstacles, collision walls, pixel-perfect camera, 2D light, the combat
-    /// loop (enemy registry, spawner, player weapon) and the HUD.
+    /// loop (enemy registry, spawner, player weapon), the stage/XP progression and the HUD.
     ///
     /// This is authoring tooling, not gameplay. Re-running it regenerates the scene deterministically.
     /// Runtime wiring that depends on C# events is NOT done here (event subscriptions do not
@@ -36,6 +37,9 @@ namespace BattleForYourSoul.EditorTools
         private const string ProjectilePrefabPath = "Assets/_Project/Prefabs/Projectile.prefab";
         private const string WeaponDefinitionPath = "Assets/_Project/ScriptableObjects/Weapon_Default.asset";
         private const string EnemyDefinitionPath = "Assets/_Project/ScriptableObjects/Enemy_Grunt.asset";
+        private const string ProgressionDefinitionPath = "Assets/_Project/ScriptableObjects/Progression_Default.asset";
+        private const string MonsterScalingPath = "Assets/_Project/ScriptableObjects/MonsterScaling_Default.asset";
+        private const string UpgradesFolder = "Assets/_Project/ScriptableObjects/Upgrades";
 
         private const string FloorTileAPath = "Assets/_Project/Art/Environment/Tile_Floor_A.png";
         private const string FloorTileBPath = "Assets/_Project/Art/Environment/Tile_Floor_B.png";
@@ -43,8 +47,10 @@ namespace BattleForYourSoul.EditorTools
         private const string PlayerSpritePath = "Assets/_Project/Art/Characters/Player.png";
         private const string EnemySpritePath = "Assets/_Project/Art/Characters/Enemy_Grunt.png";
         private const string ProjectileSpritePath = "Assets/_Project/Art/VFX/Projectile_Bolt.png";
+        private const string UpgradeIconSpritePath = "Assets/_Project/Art/UI/Upgrade_Icon.png";
 
         private const int GroundRadiusInCells = 8;
+        private const int UpgradeCardCount = 3;
         private const float PlayerMaxHealth = 100f;
 
         [MenuItem("Tools/BattleForYourSoul/Build Game Scene")]
@@ -59,6 +65,9 @@ namespace BattleForYourSoul.EditorTools
             GameObject playerPrefab = EnsurePlayerPrefab(settings);
             EnemyDefinition enemyDefinition = EnsureEnemyDefinition();
             WeaponDefinition weaponDefinition = EnsureWeaponDefinition();
+            ProgressionDefinition progression = EnsureProgressionDefinition();
+            MonsterScaling scaling = EnsureMonsterScaling();
+            UpgradeDefinition[] upgrades = EnsureUpgrades();
             GameObject enemyPrefab = EnsureEnemyPrefab(settings, enemyDefinition);
             GameObject projectilePrefab = EnsureProjectilePrefab(settings);
 
@@ -76,10 +85,11 @@ namespace BattleForYourSoul.EditorTools
             player.transform.position = Vector3.zero;
 
             EnemySpawner spawner = BuildCombat(player, weaponDefinition, enemyDefinition, enemyPrefab, projectilePrefab);
+            (Experience experience, LevelDirector levelDirector) = BuildProgression(player, spawner, scaling, progression);
 
             BuildCamera(player.transform, settings);
             BuildLight();
-            BuildHud(player, spawner);
+            BuildHud(player, spawner, experience, levelDirector, upgrades);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, GameScenePath);
@@ -240,6 +250,90 @@ namespace BattleForYourSoul.EditorTools
             return definition;
         }
 
+        private static ProgressionDefinition EnsureProgressionDefinition()
+        {
+            var progression = AssetDatabase.LoadAssetAtPath<ProgressionDefinition>(ProgressionDefinitionPath);
+            if (progression == null)
+            {
+                progression = ScriptableObject.CreateInstance<ProgressionDefinition>();
+                AssetDatabase.CreateAsset(progression, ProgressionDefinitionPath);
+            }
+
+            EditorUtility.SetDirty(progression);
+            AssetDatabase.SaveAssets();
+            return progression;
+        }
+
+        private static MonsterScaling EnsureMonsterScaling()
+        {
+            var scaling = AssetDatabase.LoadAssetAtPath<MonsterScaling>(MonsterScalingPath);
+            if (scaling == null)
+            {
+                scaling = ScriptableObject.CreateInstance<MonsterScaling>();
+                AssetDatabase.CreateAsset(scaling, MonsterScalingPath);
+            }
+
+            EditorUtility.SetDirty(scaling);
+            AssetDatabase.SaveAssets();
+            return scaling;
+        }
+
+        private static UpgradeDefinition[] EnsureUpgrades()
+        {
+            EnsureFolder(UpgradesFolder);
+            Sprite icon = AssetDatabase.LoadAssetAtPath<Sprite>(UpgradeIconSpritePath);
+
+            return new[]
+            {
+                EnsureUpgrade("Upgrade_SharpenedBolts", "sharpened-bolts", "Sharpened Bolts", "Increase projectile damage by 1.", new Color32(232, 96, 96, 255), icon, UpgradeStat.DamageFlat, 1f),
+                EnsureUpgrade("Upgrade_RapidFire", "rapid-fire", "Rapid Fire", "Fire 12% faster.", new Color32(240, 168, 72, 255), icon, UpgradeStat.FireRatePercent, 12f),
+                EnsureUpgrade("Upgrade_FleetFooted", "fleet-footed", "Fleet Footed", "Move 8% faster.", new Color32(120, 214, 120, 255), icon, UpgradeStat.MoveSpeedPercent, 8f),
+                EnsureUpgrade("Upgrade_Vitality", "vitality", "Vitality", "Gain 20 max health.", new Color32(240, 120, 168, 255), icon, UpgradeStat.MaxHealthFlat, 20f),
+                EnsureUpgrade("Upgrade_SplitShot", "split-shot", "Split Shot", "Fire one extra projectile.", new Color32(178, 130, 240, 255), icon, UpgradeStat.ExtraProjectiles, 1f),
+                EnsureUpgrade("Upgrade_Velocity", "velocity", "Velocity", "Projectiles travel 15% faster.", new Color32(120, 210, 240, 255), icon, UpgradeStat.ProjectileSpeedPercent, 15f),
+            };
+        }
+
+        private static UpgradeDefinition EnsureUpgrade(string fileName, string id, string displayName, string description, Color32 color, Sprite icon, UpgradeStat stat, float value)
+        {
+            string path = $"{UpgradesFolder}/{fileName}.asset";
+            var upgrade = AssetDatabase.LoadAssetAtPath<UpgradeDefinition>(path);
+            if (upgrade == null)
+            {
+                upgrade = ScriptableObject.CreateInstance<UpgradeDefinition>();
+                AssetDatabase.CreateAsset(upgrade, path);
+            }
+
+            var serialized = new SerializedObject(upgrade);
+            serialized.FindProperty("id").stringValue = id;
+            serialized.FindProperty("displayName").stringValue = displayName;
+            serialized.FindProperty("description").stringValue = description;
+            serialized.FindProperty("color").colorValue = color;
+            serialized.FindProperty("icon").objectReferenceValue = icon;
+
+            SerializedProperty modifiers = serialized.FindProperty("modifiers");
+            modifiers.arraySize = 1;
+            SerializedProperty element = modifiers.GetArrayElementAtIndex(0);
+            element.FindPropertyRelative("stat").enumValueIndex = (int)stat;
+            element.FindPropertyRelative("value").floatValue = value;
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(upgrade);
+            AssetDatabase.SaveAssets();
+            return upgrade;
+        }
+
+        private static void EnsureFolder(string path)
+        {
+            if (AssetDatabase.IsValidFolder(path))
+            {
+                return;
+            }
+
+            string parent = System.IO.Path.GetDirectoryName(path)!.Replace('\\', '/');
+            AssetDatabase.CreateFolder(parent, System.IO.Path.GetFileName(path));
+        }
+
         private static TileBase EnsureTile(string name, string spritePath)
         {
             string tilePath = $"Assets/_Project/ScriptableObjects/{name}.asset";
@@ -364,7 +458,33 @@ namespace BattleForYourSoul.EditorTools
             return spawner;
         }
 
-        private static void BuildHud(GameObject player, EnemySpawner spawner)
+        private static (Experience, LevelDirector) BuildProgression(GameObject player, EnemySpawner spawner, MonsterScaling scaling, ProgressionDefinition progression)
+        {
+            var experience = player.AddComponent<Experience>();
+            SetSerializedReference(experience, "progression", progression);
+
+            var stats = player.AddComponent<PlayerStats>();
+            SetSerializedReference(stats, "health", player.GetComponent<Health>());
+            SetSerializedReference(stats, "weapon", player.GetComponent<WeaponController>());
+            SetSerializedReference(stats, "movement", player.GetComponent<PlayerMovement>());
+
+            // The stage owns the monster level and feeds it to the spawner; the spawner in turn counts
+            // kills for it. Both references are assigned here because the objects are created together.
+            var directorGo = new GameObject("Level Director");
+            var director = directorGo.AddComponent<LevelDirector>();
+            SetSerializedReference(director, "spawner", spawner);
+            SetSerializedReference(director, "scaling", scaling);
+            SetSerializedReference(spawner, "levelDirector", director);
+
+            var granterGo = new GameObject("Kill XP Granter");
+            var granter = granterGo.AddComponent<KillXpGranter>();
+            SetSerializedReference(granter, "spawner", spawner);
+            SetSerializedReference(granter, "experience", experience);
+
+            return (experience, director);
+        }
+
+        private static void BuildHud(GameObject player, EnemySpawner spawner, Experience experience, LevelDirector levelDirector, UpgradeDefinition[] upgrades)
         {
             var canvasGo = new GameObject("HUD", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = canvasGo.GetComponent<Canvas>();
@@ -410,6 +530,47 @@ namespace BattleForYourSoul.EditorTools
             killLabel.fontSize = 36;
             killLabel.color = new Color32(236, 236, 244, 255);
 
+            // Stage indicator, centered at the top so it reads separately from kills and health.
+            Text stageLabel = CreateText("StageLabel", canvasGo.transform, font, "Stage 1", TextAnchor.UpperCenter);
+            RectTransform stageRect = stageLabel.rectTransform;
+            stageRect.anchorMin = new Vector2(0.5f, 1f);
+            stageRect.anchorMax = new Vector2(0.5f, 1f);
+            stageRect.pivot = new Vector2(0.5f, 1f);
+            stageRect.anchoredPosition = new Vector2(0f, -20f);
+            stageRect.sizeDelta = new Vector2(400f, 48f);
+            stageLabel.fontSize = 36;
+            stageLabel.color = new Color32(232, 216, 96, 255);
+
+            // XP bar along the bottom, with the current level above it.
+            Image xpBackground = CreateImage("XpBar", canvasGo.transform, new Color32(18, 16, 26, 220));
+            RectTransform xpRect = xpBackground.rectTransform;
+            xpRect.anchorMin = new Vector2(0.5f, 0f);
+            xpRect.anchorMax = new Vector2(0.5f, 0f);
+            xpRect.pivot = new Vector2(0.5f, 0f);
+            xpRect.anchoredPosition = new Vector2(0f, 28f);
+            xpRect.sizeDelta = new Vector2(820f, 22f);
+
+            Image xpFill = CreateImage("Fill", xpBackground.transform, new Color32(64, 214, 158, 255));
+            RectTransform xpFillRect = xpFill.rectTransform;
+            xpFillRect.anchorMin = Vector2.zero;
+            xpFillRect.anchorMax = Vector2.one;
+            xpFillRect.offsetMin = new Vector2(3f, 3f);
+            xpFillRect.offsetMax = new Vector2(-3f, -3f);
+            xpFill.type = Image.Type.Filled;
+            xpFill.fillMethod = Image.FillMethod.Horizontal;
+            xpFill.fillOrigin = (int)Image.OriginHorizontal.Left;
+            xpFill.fillAmount = 0f;
+
+            Text levelLabel = CreateText("LevelLabel", canvasGo.transform, font, "Lv 1", TextAnchor.MiddleCenter);
+            RectTransform levelRect = levelLabel.rectTransform;
+            levelRect.anchorMin = new Vector2(0.5f, 0f);
+            levelRect.anchorMax = new Vector2(0.5f, 0f);
+            levelRect.pivot = new Vector2(0.5f, 0f);
+            levelRect.anchoredPosition = new Vector2(0f, 56f);
+            levelRect.sizeDelta = new Vector2(300f, 32f);
+            levelLabel.fontSize = 26;
+            levelLabel.color = new Color32(198, 255, 232, 255);
+
             // Game-over overlay (hidden until the player dies).
             Image panel = CreateImage("GameOverPanel", canvasGo.transform, new Color32(10, 8, 16, 224));
             RectTransform panelRect = panel.rectTransform;
@@ -433,17 +594,118 @@ namespace BattleForYourSoul.EditorTools
 
             panel.gameObject.SetActive(false);
 
+            // Level-up choice overlay (hidden until a level is gained).
+            Image levelPanel = CreateImage("LevelUpPanel", canvasGo.transform, new Color32(10, 8, 16, 232));
+            RectTransform levelPanelRect = levelPanel.rectTransform;
+            levelPanelRect.anchorMin = Vector2.zero;
+            levelPanelRect.anchorMax = Vector2.one;
+            levelPanelRect.offsetMin = Vector2.zero;
+            levelPanelRect.offsetMax = Vector2.zero;
+
+            Text levelTitle = CreateText("Title", levelPanel.transform, font, "LEVEL UP", TextAnchor.MiddleCenter);
+            RectTransform levelTitleRect = levelTitle.rectTransform;
+            levelTitleRect.anchorMin = new Vector2(0.5f, 0.5f);
+            levelTitleRect.anchorMax = new Vector2(0.5f, 0.5f);
+            levelTitleRect.pivot = new Vector2(0.5f, 0.5f);
+            levelTitleRect.anchoredPosition = new Vector2(0f, 250f);
+            levelTitleRect.sizeDelta = new Vector2(900f, 100f);
+            levelTitle.fontSize = 72;
+            levelTitle.color = new Color32(198, 255, 232, 255);
+
+            Text levelHint = CreateText("Hint", levelPanel.transform, font, "Choose an upgrade", TextAnchor.MiddleCenter);
+            RectTransform levelHintRect = levelHint.rectTransform;
+            levelHintRect.anchorMin = new Vector2(0.5f, 0.5f);
+            levelHintRect.anchorMax = new Vector2(0.5f, 0.5f);
+            levelHintRect.pivot = new Vector2(0.5f, 0.5f);
+            levelHintRect.anchoredPosition = new Vector2(0f, 178f);
+            levelHintRect.sizeDelta = new Vector2(900f, 48f);
+            levelHint.fontSize = 30;
+            levelHint.color = new Color32(206, 206, 218, 255);
+
+            var cards = new UpgradeCardView[UpgradeCardCount];
+            for (int i = 0; i < cards.Length; i++)
+            {
+                float x = (i - (cards.Length - 1) * 0.5f) * 380f;
+                cards[i] = CreateUpgradeCard(levelPanel.transform, font, new Vector2(x, -20f));
+            }
+
+            levelPanel.gameObject.SetActive(false);
+
             var hud = canvasGo.AddComponent<GameHud>();
             SetSerializedReference(hud, "healthFill", healthFill);
             SetSerializedReference(hud, "killLabel", killLabel);
             SetSerializedReference(hud, "playerHealth", player.GetComponent<Health>());
             SetSerializedReference(hud, "spawner", spawner);
+            SetSerializedReference(hud, "experience", experience);
+            SetSerializedReference(hud, "xpFill", xpFill);
+            SetSerializedReference(hud, "levelLabel", levelLabel);
+            SetSerializedReference(hud, "levelDirector", levelDirector);
+            SetSerializedReference(hud, "stageLabel", stageLabel);
 
             var gameOver = canvasGo.AddComponent<GameOverController>();
             SetSerializedReference(gameOver, "panel", panel.gameObject);
             SetSerializedReference(gameOver, "restartButton", restartButton);
             SetSerializedReference(gameOver, "menuButton", menuButton);
             SetSerializedReference(gameOver, "playerHealth", player.GetComponent<Health>());
+
+            var levelUp = canvasGo.AddComponent<LevelUpController>();
+            SetSerializedReference(levelUp, "experience", experience);
+            SetSerializedReference(levelUp, "stats", player.GetComponent<PlayerStats>());
+            SetSerializedReference(levelUp, "playerHealth", player.GetComponent<Health>());
+            SetSerializedReference(levelUp, "panel", levelPanel.gameObject);
+            SetSerializedArray(levelUp, "cards", cards);
+            SetSerializedArray(levelUp, "upgrades", upgrades);
+        }
+
+        private static UpgradeCardView CreateUpgradeCard(Transform parent, Font font, Vector2 anchoredPosition)
+        {
+            Image background = CreateImage("UpgradeCard", parent, new Color32(34, 30, 50, 240));
+            RectTransform rect = background.rectTransform;
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = new Vector2(340f, 420f);
+
+            var button = background.gameObject.AddComponent<Button>();
+            button.targetGraphic = background;
+
+            Image icon = CreateImage("Icon", background.transform, Color.white);
+            RectTransform iconRect = icon.rectTransform;
+            iconRect.anchorMin = new Vector2(0.5f, 1f);
+            iconRect.anchorMax = new Vector2(0.5f, 1f);
+            iconRect.pivot = new Vector2(0.5f, 1f);
+            iconRect.anchoredPosition = new Vector2(0f, -28f);
+            iconRect.sizeDelta = new Vector2(96f, 96f);
+            icon.enabled = false;
+
+            Text title = CreateText("Title", background.transform, font, "", TextAnchor.MiddleCenter);
+            RectTransform titleRect = title.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 1f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.anchoredPosition = new Vector2(0f, -140f);
+            titleRect.sizeDelta = new Vector2(-24f, 60f);
+            title.fontSize = 30;
+            title.color = Color.white;
+
+            Text description = CreateText("Description", background.transform, font, "", TextAnchor.UpperCenter);
+            RectTransform descriptionRect = description.rectTransform;
+            descriptionRect.anchorMin = new Vector2(0f, 0f);
+            descriptionRect.anchorMax = new Vector2(1f, 1f);
+            descriptionRect.offsetMin = new Vector2(18f, 24f);
+            descriptionRect.offsetMax = new Vector2(-18f, -210f);
+            description.fontSize = 24;
+            description.color = new Color32(206, 206, 218, 255);
+            description.horizontalOverflow = HorizontalWrapMode.Wrap;
+            description.verticalOverflow = VerticalWrapMode.Overflow;
+
+            var view = background.gameObject.AddComponent<UpgradeCardView>();
+            SetSerializedReference(view, "button", button);
+            SetSerializedReference(view, "icon", icon);
+            SetSerializedReference(view, "titleLabel", title);
+            SetSerializedReference(view, "descriptionLabel", description);
+            return view;
         }
 
         private static Image CreateImage(string name, Transform parent, Color32 color)
@@ -558,6 +820,25 @@ namespace BattleForYourSoul.EditorTools
             }
 
             property.floatValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void SetSerializedArray(Object target, string propertyName, Object[] values)
+        {
+            var serialized = new SerializedObject(target);
+            SerializedProperty property = serialized.FindProperty(propertyName);
+            if (property == null)
+            {
+                Debug.LogError($"[GameSceneBuilder] No serialized property '{propertyName}' on {target.GetType().Name}.");
+                return;
+            }
+
+            property.arraySize = values.Length;
+            for (int i = 0; i < values.Length; i++)
+            {
+                property.GetArrayElementAtIndex(i).objectReferenceValue = values[i];
+            }
+
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
     }

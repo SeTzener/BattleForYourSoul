@@ -89,6 +89,27 @@ namespace BattleForYourSoul.Combat
             Changed?.Invoke(this);
         }
 
+        /// <summary>
+        /// Changes the maximum without refilling. When <paramref name="healDifference"/> is set and the
+        /// maximum grows, current health grows by the same amount, so a max-health upgrade is felt at
+        /// once. Used by upgrades that raise the cap mid-run.
+        /// </summary>
+        public void SetMax(float maximum, bool healDifference)
+        {
+            float previousMax = maxHealth;
+            maxHealth = Mathf.Max(1f, maximum);
+
+            float current = _initialized ? _current : previousMax;
+            if (healDifference && maxHealth > previousMax)
+            {
+                current += maxHealth - previousMax;
+            }
+
+            _current = Mathf.Clamp(current, 0f, maxHealth);
+            _initialized = true;
+            Changed?.Invoke(this);
+        }
+
         /// <summary>Restores full health and re-arms death handling. Used on pooled respawn.</summary>
         public void ResetToFull()
         {
