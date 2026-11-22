@@ -6,7 +6,8 @@ using BattleForYourSoul.Progression;
 namespace BattleForYourSoul.Enemies
 {
     /// <summary>
-    /// A pooled enemy: walks straight at a target and deals contact damage. It is configured from an
+    /// A pooled enemy: waits at its post until the target comes close, then walks straight at it and
+    /// deals contact damage. It is configured from an
     /// <see cref="EnemyDefinition"/> every time it is taken from the pool, so one prefab can back
     /// many enemy types.
     ///
@@ -29,6 +30,9 @@ namespace BattleForYourSoul.Enemies
         private float _moveSpeed;
         private float _xpReward;
         private int _monsterLevel;
+        private float _aggroRadius;
+        private float _aggroDelay;
+        private bool _aggroed;
         private bool _active;
 
         /// <summary>XP this enemy is worth when killed, already scaled by its monster level.</summary>
@@ -83,6 +87,10 @@ namespace BattleForYourSoul.Enemies
             _target = target;
             _registry = registry;
             _monsterLevel = Mathf.Max(1, level);
+            _aggroRadius = definition != null ? definition.AggroRadius : 0f;
+            // Ignore the spawn frame so a stage-entry teleport cannot accidentally aggro guards.
+            _aggroDelay = 0.25f;
+            _aggroed = false;
             _active = true;
 
             if (definition != null)
@@ -129,8 +137,29 @@ namespace BattleForYourSoul.Enemies
                 return;
             }
 
+            if (_aggroDelay > 0f)
+            {
+                _aggroDelay -= Time.fixedDeltaTime;
+                _body.linearVelocity = Vector2.zero;
+                return;
+            }
+
             Vector2 toTarget = (Vector2)_target.position - _body.position;
-            if (toTarget.sqrMagnitude < 0.0001f)
+            float distanceSqr = toTarget.sqrMagnitude;
+
+            // Stationed enemies wait until the player comes close, then commit to the chase.
+            if (!_aggroed)
+            {
+                if (distanceSqr > _aggroRadius * _aggroRadius)
+                {
+                    _body.linearVelocity = Vector2.zero;
+                    return;
+                }
+
+                _aggroed = true;
+            }
+
+            if (distanceSqr < 0.0001f)
             {
                 _body.linearVelocity = Vector2.zero;
                 return;
@@ -145,15 +174,25 @@ namespace BattleForYourSoul.Enemies
             }
         }
 
-        private void HandleDied(Health _)
+        /// <summary>
+        /// Stops and unregisters an enemy without treating it as a kill. Used when a stage is reset
+        /// while enemies are still alive; the caller returns it to the pool.
+        /// </summary>
+        public void Despawn()
         {
             _active = false;
+            _aggroed = false;
             if (_body != null)
             {
                 _body.linearVelocity = Vector2.zero;
             }
 
             _registry?.Unregister(this);
+        }
+
+        private void HandleDied(Health _)
+        {
+            Despawn();
             _release?.Invoke(this);
         }
     }

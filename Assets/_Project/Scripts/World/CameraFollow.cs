@@ -25,6 +25,21 @@ namespace BattleForYourSoul.World
             _velocity = Vector3.zero;
         }
 
+        /// <summary>Cuts directly to the target after a teleport instead of panning across the room.</summary>
+        public void SnapToTarget()
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            _velocity = Vector3.zero;
+            transform.position = new Vector3(
+                target.position.x + offset.x,
+                target.position.y + offset.y,
+                transform.position.z);
+        }
+
         private void LateUpdate()
         {
             if (target == null)

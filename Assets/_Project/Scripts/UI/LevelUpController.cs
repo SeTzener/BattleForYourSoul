@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 using BattleForYourSoul.Combat;
 using BattleForYourSoul.Player;
 using BattleForYourSoul.Progression;
@@ -8,12 +9,11 @@ using BattleForYourSoul.Progression;
 namespace BattleForYourSoul.UI
 {
     /// <summary>
-    /// Presents the level-up choice: it pauses the run, offers a random set of distinct upgrades,
-    /// applies the picked one, and resumes. Several level-ups gained at once are queued and shown
-    /// one after another.
+    /// Presents the upgrade choice: it pauses the run, offers a random set of distinct upgrades,
+    /// applies the picked one, and resumes. Level-ups and door-picked stage-clear rewards share one
+    /// queue, so a category choice never interrupts an already-open panel.
     ///
-    /// It reacts to <see cref="Experience.LeveledUp"/> and owns all time-scale changes for the
-    /// choice, and yields to <see cref="GameOverController"/> if the player dies.
+    /// A queued category filters the cards to upgrades in that category and updates the panel title.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LevelUpController : MonoBehaviour
@@ -25,10 +25,14 @@ namespace BattleForYourSoul.UI
         [SerializeField] private GameObject panel;
         [SerializeField] private UpgradeCardView[] cards;
         [SerializeField] private UpgradePool pool;
+        [SerializeField] private Text titleLabel;
+        [SerializeField] private Text hintLabel;
 
         private readonly List<UpgradeDefinition> _choices = new List<UpgradeDefinition>();
         private readonly List<UpgradeDefinition> _scratch = new List<UpgradeDefinition>();
-        private int _pending;
+
+        // A null category is a normal XP level-up; a non-null one is a door-picked clear reward.
+        private readonly Queue<UpgradeCategoryDefinition> _queue = new Queue<UpgradeCategoryDefinition>();
         private bool _showing;
         private bool _dead;
 
@@ -68,19 +72,43 @@ namespace BattleForYourSoul.UI
             }
         }
 
-        private void HandleLeveledUp(int _)
+        /// <summary>
+        /// Queues a filtered choice for clearing a stage after the player picked this category at a
+        /// door. If a panel is already open, the category reward appears after it is answered.
+        /// </summary>
+        public void QueueCategoryReward(UpgradeCategoryDefinition category)
         {
-            _pending++;
-            if (!_showing && !_dead)
+            if (category == null || _dead)
+            {
+                return;
+            }
+
+            Enqueue(category);
+        }
+
+        private void Enqueue(UpgradeCategoryDefinition category)
+        {
+            if (_dead)
+            {
+                return;
+            }
+
+            _queue.Enqueue(category);
+            if (!_showing)
             {
                 ShowNext();
             }
         }
 
+        private void HandleLeveledUp(int _)
+        {
+            Enqueue(null);
+        }
+
         private void HandlePlayerDied(Health _)
         {
             _dead = true;
-            _pending = 0;
+            _queue.Clear();
             _showing = false;
             ClearCards();
 
@@ -92,14 +120,14 @@ namespace BattleForYourSoul.UI
 
         private void ShowNext()
         {
-            if (_pending <= 0)
+            if (_queue.Count == 0)
             {
                 Hide();
                 return;
             }
 
-            _pending--;
-            BuildChoices();
+            UpgradeCategoryDefinition category = _queue.Dequeue();
+            BuildChoices(category);
 
             if (_choices.Count == 0)
             {
@@ -109,6 +137,20 @@ namespace BattleForYourSoul.UI
 
             _showing = true;
             Time.timeScale = 0f;
+
+            if (titleLabel != null)
+            {
+                titleLabel.text = category != null
+                    ? $"{category.DisplayName.ToUpperInvariant()} UPGRADE"
+                    : "LEVEL UP";
+            }
+
+            if (hintLabel != null)
+            {
+                hintLabel.text = category != null
+                    ? $"Choose a {category.DisplayName} upgrade"
+                    : "Choose an upgrade";
+            }
 
             if (panel != null)
             {
@@ -147,7 +189,7 @@ namespace BattleForYourSoul.UI
                 stats.Apply(upgrade);
             }
 
-            if (_pending > 0)
+            if (_queue.Count > 0)
             {
                 ShowNext();
             }
@@ -173,9 +215,21 @@ namespace BattleForYourSoul.UI
             }
         }
 
-        private void BuildChoices()
+        private void BuildChoices(UpgradeCategoryDefinition category)
         {
             _choices.Clear();
+            Collect(category);
+
+            // A category with too few authored upgrades falls back to the full pool rather than
+            // blocking the run with an empty choice.
+            if (_choices.Count == 0 && category != null)
+            {
+                Collect(null);
+            }
+        }
+
+        private void Collect(UpgradeCategoryDefinition category)
+        {
             _scratch.Clear();
 
             if (pool == null)
@@ -186,10 +240,17 @@ namespace BattleForYourSoul.UI
             for (int i = 0; i < pool.Count; i++)
             {
                 UpgradeDefinition upgrade = pool.Get(i);
-                if (upgrade != null)
+                if (upgrade == null)
                 {
-                    _scratch.Add(upgrade);
+                    continue;
                 }
+
+                if (category != null && upgrade.Category != category)
+                {
+                    continue;
+                }
+
+                _scratch.Add(upgrade);
             }
 
             int want = Mathf.Min(cards.Length, _scratch.Count);

@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: Progression_Default
   m_EditorClassIdentifier: BattleForYourSoul::BattleForYourSoul.Progression.ProgressionDefinition
   startingLevel: 1
-  baseXp: 5
-  growth: 1.32
+  baseXp: 8
+  growth: 1.5

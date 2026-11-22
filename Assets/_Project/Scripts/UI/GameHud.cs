@@ -7,9 +7,9 @@ using BattleForYourSoul.Progression;
 namespace BattleForYourSoul.UI
 {
     /// <summary>
-    /// Minimal run HUD: a player health bar, an XP bar with the current level, a stage indicator and
-    /// a kill counter. It only reflects state pushed by <see cref="Health"/>, <see cref="Experience"/>,
-    /// <see cref="LevelDirector"/> and <see cref="EnemySpawner"/> events; it never polls or searches.
+    /// Minimal run HUD: health, XP, stage, kills and a room objective. It only reflects state pushed
+    /// by <see cref="Health"/>, <see cref="Experience"/>, <see cref="EnemySpawner"/> and
+    /// <see cref="LevelDirector"/> events; it never polls or searches.
     /// </summary>
     public sealed class GameHud : MonoBehaviour
     {
@@ -23,6 +23,7 @@ namespace BattleForYourSoul.UI
         [SerializeField] private Text levelLabel;
         [SerializeField] private LevelDirector levelDirector;
         [SerializeField] private Text stageLabel;
+        [SerializeField] private Text objectiveLabel;
 
         private void OnEnable()
         {
@@ -47,7 +48,12 @@ namespace BattleForYourSoul.UI
             if (levelDirector != null)
             {
                 levelDirector.LevelChanged += HandleStageChanged;
+                levelDirector.RemainingChanged += HandleObjectiveChanged;
+                levelDirector.ClearedChanged += HandleObjectiveChanged;
+                levelDirector.PendingCategoryChanged += HandleObjectiveChanged;
+
                 HandleStageChanged(levelDirector.StageNumber);
+                HandleObjectiveChanged();
             }
         }
 
@@ -71,6 +77,9 @@ namespace BattleForYourSoul.UI
             if (levelDirector != null)
             {
                 levelDirector.LevelChanged -= HandleStageChanged;
+                levelDirector.RemainingChanged -= HandleObjectiveChanged;
+                levelDirector.ClearedChanged -= HandleObjectiveChanged;
+                levelDirector.PendingCategoryChanged -= HandleObjectiveChanged;
             }
         }
 
@@ -109,6 +118,36 @@ namespace BattleForYourSoul.UI
             {
                 stageLabel.text = $"Stage {stage}";
             }
+        }
+
+        private void HandleObjectiveChanged()
+        {
+            if (objectiveLabel == null || levelDirector == null)
+            {
+                return;
+            }
+
+            UpgradeCategoryDefinition pending = levelDirector.PendingRewardCategory;
+            string reward = pending != null ? pending.DisplayName : "none";
+
+            objectiveLabel.text = levelDirector.IsCleared
+                ? $"Exits open - choose a door (clear reward: {reward})"
+                : $"Enemies: {levelDirector.EnemiesRemaining} - clear reward: {reward}";
+        }
+
+        private void HandleObjectiveChanged(int _)
+        {
+            HandleObjectiveChanged();
+        }
+
+        private void HandleObjectiveChanged(bool _)
+        {
+            HandleObjectiveChanged();
+        }
+
+        private void HandleObjectiveChanged(UpgradeCategoryDefinition _)
+        {
+            HandleObjectiveChanged();
         }
     }
 }

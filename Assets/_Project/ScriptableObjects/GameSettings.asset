@@ -18,3 +18,9 @@ MonoBehaviour:
   tileSizeInPixels: {x: 32, y: 16}
   groundSortingLayer: Ground
   entitySortingLayer: Entities
+  vfxSortingLayer: VFX
+  roomEntrance: {x: 0, y: -3}
+  doorPositions:
+  - {x: -3.2, y: 3.55}
+  - {x: 0, y: 3.85}
+  - {x: 3.2, y: 3.55}
