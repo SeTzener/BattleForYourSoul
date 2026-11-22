@@ -28,6 +28,41 @@ Examples of good one-line messages:
 - `Add health, damage and contact-damage primitives`
 - `Add combat HUD and game-over flow`
 
+## Pull requests
+
+- The PR title must explain the **entire scope** of the change. Do not use short milestone labels.
+- The description uses these sections, in this order:
+
+  1. `## TLDR` — only when the scope is too big. A short, human-readable summary of the whole change.
+  2. `## What` — human-readable bullet points explaining what changed in the code.
+  3. `## Why` — one bullet per `## What` point, in the same order, explaining why that change was made.
+  4. `## Attachment` — only when pictures are needed to explain something.
+  5. `## Note:` — only at the bottom, when something needs a better explanation.
+
+- Keep `What` and `Why` aligned one-to-one: every `What` bullet has a matching `Why` bullet.
+- Do not use the old `## What's included` / `## Verified` / `## Notes` layout.
+
+Skeleton:
+
+```markdown
+## TLDR
+Short summary when the scope is large.
+
+## What
+- Human-readable description of change one.
+- Human-readable description of change two.
+
+## Why
+- Why change one was needed.
+- Why change two was needed.
+
+## Attachment
+Images only when they help explain something.
+
+## Note:
+Extra explanation only if needed.
+```
+
 ## Note
 
 Every time new instructions are given, this file must be updated accordingly. Asking the
