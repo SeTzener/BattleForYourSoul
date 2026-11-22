@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using BattleForYourSoul.Combat;
+using BattleForYourSoul.Progression;
 
 namespace BattleForYourSoul.Enemies
 {
@@ -25,7 +26,15 @@ namespace BattleForYourSoul.Enemies
         private EnemyRegistry _registry;
         private Action<Enemy> _release;
         private float _moveSpeed;
+        private float _xpReward;
+        private int _monsterLevel;
         private bool _active;
+
+        /// <summary>XP this enemy is worth when killed, already scaled by its monster level.</summary>
+        public float XpReward => _xpReward;
+
+        /// <summary>Monster level this enemy was spawned at.</summary>
+        public int MonsterLevel => _monsterLevel;
 
         private void Awake()
         {
@@ -63,15 +72,22 @@ namespace BattleForYourSoul.Enemies
         }
 
         /// <summary>Resets per-spawn state. Called right after the pool hands this enemy out.</summary>
-        public void Initialize(EnemyDefinition definition, Transform target, EnemyRegistry registry)
+        public void Initialize(EnemyDefinition definition, int level, MonsterScaling scaling, Transform target, EnemyRegistry registry)
         {
             _target = target;
             _registry = registry;
+            _monsterLevel = Mathf.Max(1, level);
             _active = true;
 
             if (definition != null)
             {
-                _moveSpeed = definition.MoveSpeed;
+                float healthMultiplier = scaling != null ? scaling.HealthMultiplier(_monsterLevel) : 1f;
+                float damageMultiplier = scaling != null ? scaling.DamageMultiplier(_monsterLevel) : 1f;
+                float speedMultiplier = scaling != null ? scaling.SpeedMultiplier(_monsterLevel) : 1f;
+                float xpMultiplier = scaling != null ? scaling.XpMultiplier(_monsterLevel) : 1f;
+
+                _moveSpeed = definition.MoveSpeed * speedMultiplier;
+                _xpReward = definition.XpReward * xpMultiplier;
 
                 if (spriteRenderer != null)
                 {
@@ -79,16 +95,17 @@ namespace BattleForYourSoul.Enemies
                     spriteRenderer.flipX = false;
                 }
 
-                health.Configure(definition.MaxHealth);
+                health.Configure(definition.MaxHealth * healthMultiplier);
 
                 if (contactDamage != null)
                 {
-                    contactDamage.Configure(1 << LayerMask.NameToLayer("Player"), definition.ContactDamage, definition.ContactDamageInterval);
+                    contactDamage.Configure(1 << LayerMask.NameToLayer("Player"), definition.ContactDamage * damageMultiplier, definition.ContactDamageInterval);
                 }
             }
             else
             {
                 _moveSpeed = 0f;
+                _xpReward = 0f;
             }
 
             registry?.Register(this);

@@ -26,12 +26,22 @@ namespace BattleForYourSoul.Player
         private Rigidbody2D _body;
         private IPlayerInput _input;
         private Vector2 _desiredVelocity;
+        private float _speedMultiplier = 1f;
 
         /// <summary>Last non-zero input direction in screen space. Presentation reads this.</summary>
         public Vector2 Facing { get; private set; } = Vector2.down;
 
         /// <summary>Current world-space velocity, for UI/VFX that need it.</summary>
         public Vector2 Velocity => _body != null ? _body.linearVelocity : Vector2.zero;
+
+        /// <summary>The authored speed, before any upgrade multiplier.</summary>
+        public float BaseMoveSpeed => moveSpeed;
+
+        /// <summary>Applies an upgrade speed multiplier. Pushed by the player's stats.</summary>
+        public void SetSpeedMultiplier(float multiplier)
+        {
+            _speedMultiplier = Mathf.Max(0f, multiplier);
+        }
 
         private void Awake()
         {
@@ -48,7 +58,7 @@ namespace BattleForYourSoul.Player
             }
 
             Vector2 worldDirection = IsometricUtility.ScreenDirectionToWorld(screenDirection);
-            _desiredVelocity = worldDirection * moveSpeed;
+            _desiredVelocity = worldDirection * (moveSpeed * _speedMultiplier);
 
             if (screenDirection.sqrMagnitude > 0.0001f)
             {
