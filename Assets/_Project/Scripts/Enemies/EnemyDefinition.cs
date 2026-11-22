@@ -17,6 +17,9 @@ namespace BattleForYourSoul.Enemies
         [SerializeField, Min(1f)] private float maxHealth = 3f;
         [SerializeField, Min(0f)] private float moveSpeed = 2.2f;
 
+        [Tooltip("Distance from the target at which a stationed enemy starts chasing.")]
+        [SerializeField, Min(0f)] private float aggroRadius = 3f;
+
         [Header("Contact Damage")]
         [SerializeField, Min(0f)] private float contactDamage = 6f;
         [SerializeField, Min(0.05f)] private float contactDamageInterval = 0.85f;
@@ -32,6 +35,7 @@ namespace BattleForYourSoul.Enemies
         public Sprite Sprite => sprite;
         public float MaxHealth => maxHealth;
         public float MoveSpeed => moveSpeed;
+        public float AggroRadius => aggroRadius;
         public float ContactDamage => contactDamage;
         public float ContactDamageInterval => contactDamageInterval;
         public float XpReward => xpReward;

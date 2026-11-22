@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using BattleForYourSoul.Infrastructure;
 using BattleForYourSoul.Progression;
@@ -6,53 +7,48 @@ using BattleForYourSoul.Progression;
 namespace BattleForYourSoul.Enemies
 {
     /// <summary>
-    /// Spawns enemies around the target on a timer, capped by a live-enemy limit, using a pool so
-    /// the fight does not churn garbage.
+    /// Places the authored enemies for the current stage and tracks how many are left. Enemies are
+    /// pooled and spawned once at fixed positions; there is no timer and no replacement wave.
     ///
-    /// It owns the pool and is the single place that counts kills, which the HUD subscribes to.
+    /// Clearing every placement raises <see cref="Cleared"/>, which lets the level director unlock
+    /// the exits. The spawner owns the pool and the live-enemy count, but no run state.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class EnemySpawner : MonoBehaviour
     {
         [Header("Wiring")]
         [SerializeField] private Enemy enemyPrefab;
-        [Tooltip("Fallback enemy used when the current stage has no roster.")]
+        [Tooltip("Fallback enemy used when an authored placement has no type.")]
         [SerializeField] private EnemyDefinition definition;
         [SerializeField] private EnemyRegistry registry;
-        [SerializeField] private LevelDirector levelDirector;
         [SerializeField] private Transform target;
 
-        [Header("Spawning (fallbacks when no stage is configured)")]
-        [Tooltip("Seconds between spawns.")]
-        [SerializeField, Min(0.05f)] private float spawnInterval = 1.2f;
-
-        [Tooltip("Never keep more than this many enemies alive at once.")]
-        [SerializeField, Min(1)] private int maxAlive = 30;
-
-        [Tooltip("Enemies spawn on a ring of this radius around the target.")]
-        [SerializeField, Min(0.1f)] private float spawnRadius = 7f;
-
-        [Tooltip("Half-extents the spawn position is clamped to, keeping spawns inside the arena.")]
-        [SerializeField] private Vector2 spawnBounds = new Vector2(7.5f, 3.8f);
-
         [Header("Pool")]
-        [SerializeField, Min(0)] private int prewarmCount = 32;
-        [SerializeField, Min(1)] private int maxPoolSize = 128;
+        [SerializeField, Min(0)] private int prewarmCount = 16;
+        [SerializeField, Min(1)] private int maxPoolSize = 64;
 
+        private readonly List<Enemy> _live = new List<Enemy>();
         private PrefabPool<Enemy> _pool;
-        private StageDefinition _stage;
-        private float _cooldown;
         private int _kills;
-        private float _activeSpawnInterval;
-        private int _activeMaxAlive;
-        private float _activeSpawnRadius;
-        private Vector2 _activeSpawnBounds;
+        private int _remaining;
 
         /// <summary>Total enemies killed this run.</summary>
         public int KillCount => _kills;
 
+        /// <summary>Enemies still alive in the current room.</summary>
+        public int Remaining => _remaining;
+
+        /// <summary>True when the current room has no enemies left.</summary>
+        public bool IsCleared => _remaining <= 0;
+
         /// <summary>Raised with the new total whenever an enemy dies.</summary>
         public event Action<int> KillCountChanged;
+
+        /// <summary>Raised with the new live count whenever it changes.</summary>
+        public event Action<int> RemainingChanged;
+
+        /// <summary>Raised once when the last enemy in the room dies.</summary>
+        public event Action Cleared;
 
         /// <summary>Raised with a dying enemy just before it returns to the pool.</summary>
         public event Action<Enemy> EnemyDied;
@@ -65,127 +61,87 @@ namespace BattleForYourSoul.Enemies
                 prewarmCount,
                 maxPoolSize,
                 enemy => enemy.SetReleaseCallback(ReleaseEnemy));
-
-            ApplyStage();
         }
 
         /// <summary>
-        /// Applies a stage's pacing and roster. Called by the level director on start and on every
-        /// stage change; without a stage the serialized fallbacks are used.
+        /// Replaces the current room with the stage's authored placements. Called by the level
+        /// director on start and on every stage change. Surviving enemies are returned to the pool
+        /// without counting as kills.
         /// </summary>
-        public void Configure(StageDefinition stage)
+        public void Configure(StageDefinition stage, int level, MonsterScaling scaling)
         {
-            _stage = stage;
-            ApplyStage();
-        }
+            DespawnAll();
 
-        private void ApplyStage()
-        {
-            _activeSpawnInterval = _stage != null ? _stage.SpawnInterval : spawnInterval;
-            _activeMaxAlive = _stage != null ? _stage.MaxAlive : maxAlive;
-            _activeSpawnRadius = _stage != null ? _stage.SpawnRadius : spawnRadius;
-            _activeSpawnBounds = _stage != null ? _stage.SpawnBounds : spawnBounds;
-            _cooldown = _activeSpawnInterval;
-        }
-
-        private void Update()
-        {
-            if (target == null || registry == null)
+            IReadOnlyList<EnemyPlacement> placements = stage != null ? stage.EnemyPlacements : null;
+            int count = placements != null ? placements.Count : 0;
+            for (int i = 0; i < count; i++)
             {
-                return;
+                EnemyPlacement placement = placements[i];
+                EnemyDefinition enemyDefinition = placement.Enemy != null ? placement.Enemy : definition;
+                Spawn(enemyDefinition, placement.Position, level, scaling);
             }
 
-            _cooldown -= Time.deltaTime;
-            if (_cooldown > 0f)
-            {
-                return;
-            }
-
-            _cooldown = _activeSpawnInterval;
-
-            if (registry.Count >= _activeMaxAlive)
-            {
-                return;
-            }
-
-            SpawnOne();
+            SetRemaining(_live.Count);
         }
 
-        private void SpawnOne()
+        private void Spawn(EnemyDefinition enemyDefinition, Vector2 position, int level, MonsterScaling scaling)
         {
-            EnemyDefinition spawnDefinition = PickDefinition();
-            if (spawnDefinition == null)
+            if (enemyDefinition == null || target == null || registry == null)
             {
                 return;
             }
 
             Enemy enemy = _pool.Get();
-            enemy.transform.position = PickSpawnPosition();
-
-            int level = levelDirector != null ? levelDirector.CurrentLevel : 1;
-            MonsterScaling scaling = levelDirector != null ? levelDirector.Scaling : null;
-            enemy.Initialize(spawnDefinition, level, scaling, target, registry);
+            enemy.transform.position = new Vector3(position.x, position.y, 0f);
+            enemy.Initialize(enemyDefinition, Mathf.Max(1, level), scaling, target, registry);
+            _live.Add(enemy);
         }
 
-        /// <summary>Picks a definition from the stage roster by weight, or the fallback definition.</summary>
-        private EnemyDefinition PickDefinition()
+        /// <summary>Clears the room without treating any living enemy as killed.</summary>
+        public void DespawnAll()
         {
-            var roster = _stage != null ? _stage.Roster : null;
-            if (roster == null || roster.Count == 0)
+            for (int i = 0; i < _live.Count; i++)
             {
-                return definition;
-            }
-
-            float total = 0f;
-            for (int i = 0; i < roster.Count; i++)
-            {
-                if (roster[i].Enemy != null)
-                {
-                    total += Mathf.Max(0f, roster[i].Weight);
-                }
-            }
-
-            if (total <= 0f)
-            {
-                return definition;
-            }
-
-            float roll = UnityEngine.Random.value * total;
-            for (int i = 0; i < roster.Count; i++)
-            {
-                EnemySpawnEntry entry = roster[i];
-                if (entry.Enemy == null)
+                Enemy enemy = _live[i];
+                if (enemy == null)
                 {
                     continue;
                 }
 
-                roll -= Mathf.Max(0f, entry.Weight);
-                if (roll <= 0f)
-                {
-                    return entry.Enemy;
-                }
+                enemy.Despawn();
+                _pool.Release(enemy);
             }
 
-            return definition;
+            _live.Clear();
         }
 
-        private Vector2 PickSpawnPosition()
+        private void SetRemaining(int value)
         {
-            float angle = UnityEngine.Random.value * Mathf.PI * 2f;
-            Vector2 offset = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * _activeSpawnRadius;
-            Vector2 position = (Vector2)target.position + offset;
+            int next = Mathf.Max(0, value);
+            if (next == _remaining)
+            {
+                return;
+            }
 
-            position.x = Mathf.Clamp(position.x, -_activeSpawnBounds.x, _activeSpawnBounds.x);
-            position.y = Mathf.Clamp(position.y, -_activeSpawnBounds.y, _activeSpawnBounds.y);
-            return position;
+            _remaining = next;
+            RemainingChanged?.Invoke(_remaining);
+
+            if (_remaining == 0)
+            {
+                Cleared?.Invoke();
+            }
         }
 
         private void ReleaseEnemy(Enemy enemy)
         {
+            _live.Remove(enemy);
+
             _kills++;
             KillCountChanged?.Invoke(_kills);
             EnemyDied?.Invoke(enemy);
+
             _pool.Release(enemy);
+            SetRemaining(_live.Count);
         }
     }
 }

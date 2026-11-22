@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace BattleForYourSoul.Core
@@ -36,6 +37,13 @@ namespace BattleForYourSoul.Core
         [Tooltip("Sorting layer drawn in front of entities (projectiles, hit effects).")]
         [SerializeField] private string vfxSortingLayer = "VFX";
 
+        [Header("Room")]
+        [Tooltip("Where the player appears at the start of every stage.")]
+        [SerializeField] private Vector2 roomEntrance = new Vector2(0f, -3f);
+
+        [Tooltip("World positions of the exits along the far edge of the room.")]
+        [SerializeField] private Vector2[] doorPositions;
+
         public int PixelsPerUnit => pixelsPerUnit;
         public Vector2Int ReferenceResolution => referenceResolution;
         public float IsometricRatio => isometricRatio;
@@ -43,5 +51,7 @@ namespace BattleForYourSoul.Core
         public string GroundSortingLayer => groundSortingLayer;
         public string EntitySortingLayer => entitySortingLayer;
         public string VfxSortingLayer => vfxSortingLayer;
+        public Vector2 RoomEntrance => roomEntrance;
+        public IReadOnlyList<Vector2> DoorPositions => doorPositions;
     }
 }

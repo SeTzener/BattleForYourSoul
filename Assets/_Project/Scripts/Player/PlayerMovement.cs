@@ -47,6 +47,27 @@ namespace BattleForYourSoul.Player
             _speedMultiplier = Mathf.Max(0f, multiplier);
         }
 
+        /// <summary>
+        /// Moves the player to a stage entrance and clears any motion left over from the previous
+        /// room, so walking through a door never carries momentum into the next stage.
+        /// </summary>
+        public void TeleportTo(Vector2 position)
+        {
+            if (_body == null)
+            {
+                _body = GetComponent<Rigidbody2D>();
+            }
+
+            if (_body != null)
+            {
+                _body.position = position;
+                _body.linearVelocity = Vector2.zero;
+            }
+
+            transform.position = new Vector3(position.x, position.y, transform.position.z);
+            _desiredVelocity = Vector2.zero;
+        }
+
         private void Awake()
         {
             _body = GetComponent<Rigidbody2D>();

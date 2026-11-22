@@ -39,6 +39,7 @@ namespace BattleForYourSoul.EditorTools
             GenerateEnemyGrunt();
             GenerateProjectileBolt();
             GenerateUpgradeIcon();
+            GenerateDoors();
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -238,6 +239,59 @@ namespace BattleForYourSoul.EditorTools
             FillRect(px, w, h, 4, 7, 8, 2, white);
 
             WriteSprite("Assets/_Project/Art/UI/Upgrade_Icon.png", px, w, h, SpriteAlignment.Center);
+        }
+
+        /// <summary>
+        /// Generates the visible locked/open exit placeholders. The open sprite is mostly white so
+        /// StageDoor can tint it with the category colour at runtime.
+        /// </summary>
+        public static void GenerateDoors()
+        {
+            LoadSettings();
+            EnsureFolder("Assets/_Project/Art/Environment");
+
+            const int w = 32;
+            const int h = 40;
+
+            var stone = new Color32(116, 114, 128, 255);
+            var stoneDark = new Color32(74, 72, 86, 255);
+            var stoneLight = new Color32(158, 156, 170, 255);
+            var opening = new Color32(30, 26, 42, 255);
+            var bar = new Color32(94, 90, 106, 255);
+            var metal = new Color32(184, 180, 166, 255);
+
+            // Stone frame: a rounded arch over straight jambs.
+            var frame = new Color32[w * h];
+            FillRect(frame, w, h, 4, 0, 24, 31, stone);
+            FillEllipse(frame, w, h, 16, 31, 12, 9, stone);
+            FillRect(frame, w, h, 4, 0, 3, 31, stoneDark);
+            FillRect(frame, w, h, 25, 0, 3, 31, stoneDark);
+            FillRect(frame, w, h, 6, 2, 2, 28, stoneLight);
+            FillEllipse(frame, w, h, 16, 34, 9, 5, stoneLight);
+
+            // Carve the doorway back out of the frame.
+            FillRect(frame, w, h, 8, 0, 16, 31, opening);
+            FillEllipse(frame, w, h, 16, 31, 8, 7, opening);
+
+            // Locked: iron bars and a plate across the doorway.
+            var locked = (Color32[])frame.Clone();
+            FillRect(locked, w, h, 11, 0, 2, 31, bar);
+            FillRect(locked, w, h, 19, 0, 2, 31, bar);
+            FillRect(locked, w, h, 8, 10, 16, 2, bar);
+            FillRect(locked, w, h, 8, 21, 16, 2, bar);
+            FillRect(locked, w, h, 13, 15, 6, 6, metal);
+            FillRect(locked, w, h, 15, 17, 2, 2, opening);
+            WriteSprite("Assets/_Project/Art/Environment/Door_Closed.png", locked, w, h, SpriteAlignment.BottomCenter);
+
+            // Open: a glowing white portal, tinted per category by StageDoor.
+            var open = (Color32[])frame.Clone();
+            var glowEdge = new Color32(148, 196, 232, 190);
+            var glowCore = new Color32(246, 252, 255, 255);
+            FillEllipse(open, w, h, 16, 22, 7, 14, glowEdge);
+            FillRect(open, w, h, 10, 0, 12, 23, glowEdge);
+            FillEllipse(open, w, h, 16, 22, 5, 12, glowCore);
+            FillRect(open, w, h, 12, 0, 8, 23, glowCore);
+            WriteSprite("Assets/_Project/Art/Environment/Door_Open.png", open, w, h, SpriteAlignment.BottomCenter);
         }
 
         private static void FillDiamond(Color32[] px, int w, int h, int cx, int cy, int rx, int ry, Color32 color)

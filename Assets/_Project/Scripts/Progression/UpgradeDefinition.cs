@@ -54,6 +54,10 @@ namespace BattleForYourSoul.Progression
         [Tooltip("Tint applied to the card icon.")]
         [SerializeField] private Color color = Color.white;
 
+        [Header("Category")]
+        [Tooltip("Used by door-picked clear rewards. Uncategorised upgrades stay in normal level-ups.")]
+        [SerializeField] private UpgradeCategoryDefinition category;
+
         [Header("Effect")]
         [SerializeField] private List<StatModifier> modifiers = new List<StatModifier>();
 
@@ -62,6 +66,7 @@ namespace BattleForYourSoul.Progression
         public string Description => description;
         public Sprite Icon => icon;
         public Color Color => color;
+        public UpgradeCategoryDefinition Category => category;
         public IReadOnlyList<StatModifier> Modifiers => modifiers;
     }
 }
