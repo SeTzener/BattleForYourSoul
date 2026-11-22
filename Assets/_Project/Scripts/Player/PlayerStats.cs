@@ -9,12 +9,16 @@ namespace BattleForYourSoul.Player
     /// the resulting values are pushed into the combat and movement components, so no system has to
     /// poll or search for stats.
     ///
-    /// Base values are captured from the components on Awake; nothing is read from a definition
-    /// asset at runtime beyond the chosen upgrades themselves.
+    /// Base values come from the <see cref="PlayerDefinition"/> asset when one is assigned,
+    /// otherwise they are captured from the components on Awake.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class PlayerStats : MonoBehaviour
     {
+        [Header("Definition")]
+        [Tooltip("Optional definition asset. When set, its base stats are used instead of the components'.")]
+        [SerializeField] private PlayerDefinition definition;
+
         [Header("Wiring")]
         [SerializeField] private Health health;
         [SerializeField] private WeaponController weapon;
@@ -31,7 +35,11 @@ namespace BattleForYourSoul.Player
 
         private void Awake()
         {
-            if (health != null)
+            if (definition != null)
+            {
+                _baseMaxHealth = definition.MaxHealth;
+            }
+            else if (health != null)
             {
                 _baseMaxHealth = health.Max;
             }

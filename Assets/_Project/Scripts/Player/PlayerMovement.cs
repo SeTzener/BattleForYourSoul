@@ -13,6 +13,10 @@ namespace BattleForYourSoul.Player
     [RequireComponent(typeof(Rigidbody2D))]
     public sealed class PlayerMovement : MonoBehaviour
     {
+        [Header("Definition")]
+        [Tooltip("Optional definition asset. When set, its movement values override the fields below.")]
+        [SerializeField] private PlayerDefinition definition;
+
         [Header("Movement")]
         [Tooltip("World units per second at full input.")]
         [SerializeField, Min(0f)] private float moveSpeed = 5f;
@@ -47,6 +51,13 @@ namespace BattleForYourSoul.Player
         {
             _body = GetComponent<Rigidbody2D>();
             _input = GetComponent<IPlayerInput>();
+
+            if (definition != null)
+            {
+                moveSpeed = definition.MoveSpeed;
+                acceleration = definition.Acceleration;
+                deceleration = definition.Deceleration;
+            }
         }
 
         private void Update()

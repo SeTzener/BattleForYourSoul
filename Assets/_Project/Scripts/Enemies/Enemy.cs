@@ -20,6 +20,7 @@ namespace BattleForYourSoul.Enemies
         [SerializeField] private Health health;
         [SerializeField] private ContactDamage contactDamage;
         [SerializeField] private SpriteRenderer spriteRenderer;
+        [SerializeField] private CircleCollider2D bodyCollider;
 
         private Rigidbody2D _body;
         private Transform _target;
@@ -52,6 +53,11 @@ namespace BattleForYourSoul.Enemies
             if (spriteRenderer == null)
             {
                 spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+            }
+
+            if (bodyCollider == null)
+            {
+                bodyCollider = GetComponent<CircleCollider2D>();
             }
 
             health.Died += HandleDied;
@@ -93,6 +99,11 @@ namespace BattleForYourSoul.Enemies
                 {
                     spriteRenderer.sprite = definition.Sprite;
                     spriteRenderer.flipX = false;
+                }
+
+                if (bodyCollider != null)
+                {
+                    bodyCollider.radius = definition.ColliderRadius;
                 }
 
                 health.Configure(definition.MaxHealth * healthMultiplier);

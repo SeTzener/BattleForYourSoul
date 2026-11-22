@@ -118,6 +118,7 @@ namespace BattleForYourSoul.Combat
                 Vector2 direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
 
                 Projectile projectile = _pool.Get();
+                projectile.SetSprite(definition.ProjectileSprite);
                 projectile.Launch(origin, direction, speed, damage, definition.ProjectileLifetime, gameObject);
             }
         }

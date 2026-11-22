@@ -22,6 +22,8 @@ namespace BattleForYourSoul.EditorTools
     /// loop (enemy registry, spawner, player weapon), the stage/XP progression and the HUD.
     ///
     /// This is authoring tooling, not gameplay. Re-running it regenerates the scene deterministically.
+    /// Definition/settings assets are seeded only when they are first created, so hand-edited values
+    /// and sprites survive a rebuild. Prefabs and the scene are generated artifacts and are rebuilt.
     /// Runtime wiring that depends on C# events is NOT done here (event subscriptions do not
     /// serialize); instead the builder assigns serialized references and the components subscribe in
     /// Awake/OnEnable.
@@ -37,9 +39,13 @@ namespace BattleForYourSoul.EditorTools
         private const string ProjectilePrefabPath = "Assets/_Project/Prefabs/Projectile.prefab";
         private const string WeaponDefinitionPath = "Assets/_Project/ScriptableObjects/Weapon_Default.asset";
         private const string EnemyDefinitionPath = "Assets/_Project/ScriptableObjects/Enemy_Grunt.asset";
+        private const string PlayerDefinitionPath = "Assets/_Project/ScriptableObjects/Player_Default.asset";
         private const string ProgressionDefinitionPath = "Assets/_Project/ScriptableObjects/Progression_Default.asset";
         private const string MonsterScalingPath = "Assets/_Project/ScriptableObjects/MonsterScaling_Default.asset";
+        private const string StageProgressionPath = "Assets/_Project/ScriptableObjects/StageProgression_Default.asset";
+        private const string UpgradePoolPath = "Assets/_Project/ScriptableObjects/UpgradePool_Default.asset";
         private const string UpgradesFolder = "Assets/_Project/ScriptableObjects/Upgrades";
+        private const string StagesFolder = "Assets/_Project/ScriptableObjects/Stages";
 
         private const string FloorTileAPath = "Assets/_Project/Art/Environment/Tile_Floor_A.png";
         private const string FloorTileBPath = "Assets/_Project/Art/Environment/Tile_Floor_B.png";
@@ -62,14 +68,22 @@ namespace BattleForYourSoul.EditorTools
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             GameSettings settings = EnsureSettings();
-            GameObject playerPrefab = EnsurePlayerPrefab(settings);
+            WeaponDefinition defaultWeapon = EnsureWeaponDefinition();
             EnemyDefinition enemyDefinition = EnsureEnemyDefinition();
-            WeaponDefinition weaponDefinition = EnsureWeaponDefinition();
+            PlayerDefinition playerDefinition = EnsurePlayerDefinition(defaultWeapon);
             ProgressionDefinition progression = EnsureProgressionDefinition();
             MonsterScaling scaling = EnsureMonsterScaling();
             UpgradeDefinition[] upgrades = EnsureUpgrades();
+            UpgradePool upgradePool = EnsureUpgradePool(upgrades);
+            StageDefinition[] stages = EnsureStages(enemyDefinition);
+            StageProgression stageProgression = EnsureStageProgression(stages);
+
+            // A player asset may name its own starting weapon; fall back to the default one.
+            WeaponDefinition weaponDefinition = playerDefinition.StartingWeapon != null ? playerDefinition.StartingWeapon : defaultWeapon;
+
+            GameObject playerPrefab = EnsurePlayerPrefab(settings, playerDefinition);
             GameObject enemyPrefab = EnsureEnemyPrefab(settings, enemyDefinition);
-            GameObject projectilePrefab = EnsureProjectilePrefab(settings);
+            GameObject projectilePrefab = EnsureProjectilePrefab(settings, weaponDefinition);
 
             TileBase floorA = EnsureTile("Tile_Floor_A", FloorTileAPath);
             TileBase floorB = EnsureTile("Tile_Floor_B", FloorTileBPath);
@@ -85,31 +99,42 @@ namespace BattleForYourSoul.EditorTools
             player.transform.position = Vector3.zero;
 
             EnemySpawner spawner = BuildCombat(player, weaponDefinition, enemyDefinition, enemyPrefab, projectilePrefab);
-            (Experience experience, LevelDirector levelDirector) = BuildProgression(player, spawner, scaling, progression);
+            (Experience experience, LevelDirector levelDirector) = BuildProgression(player, spawner, scaling, progression, stageProgression, playerDefinition);
 
             BuildCamera(player.transform, settings);
             BuildLight();
-            BuildHud(player, spawner, experience, levelDirector, upgrades);
+            BuildHud(player, spawner, experience, levelDirector, upgradePool);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, GameScenePath);
             Debug.Log($"[GameSceneBuilder] Built {GameScenePath}");
         }
 
-        private static GameSettings EnsureSettings()
+        /// <summary>
+        /// Loads an asset or creates it if missing. The returned <c>created</c> flag tells the caller
+        /// whether to seed defaults: existing assets are never touched, so authored values survive.
+        /// </summary>
+        private static (T asset, bool created) EnsureAsset<T>(string path) where T : ScriptableObject
         {
-            var settings = AssetDatabase.LoadAssetAtPath<GameSettings>(SettingsAssetPath);
-            if (settings == null)
+            var existing = AssetDatabase.LoadAssetAtPath<T>(path);
+            if (existing != null)
             {
-                settings = ScriptableObject.CreateInstance<GameSettings>();
-                AssetDatabase.CreateAsset(settings, SettingsAssetPath);
-                AssetDatabase.SaveAssets();
+                return (existing, false);
             }
 
+            EnsureFolder(System.IO.Path.GetDirectoryName(path)!.Replace('\\', '/'));
+            var created = ScriptableObject.CreateInstance<T>();
+            AssetDatabase.CreateAsset(created, path);
+            return (created, true);
+        }
+
+        private static GameSettings EnsureSettings()
+        {
+            var (settings, _) = EnsureAsset<GameSettings>(SettingsAssetPath);
             return settings;
         }
 
-        private static GameObject EnsurePlayerPrefab(GameSettings settings)
+        private static GameObject EnsurePlayerPrefab(GameSettings settings, PlayerDefinition definition)
         {
             // Rebuilt from scratch so component changes here are picked up deterministically.
             if (AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath) != null)
@@ -122,7 +147,7 @@ namespace BattleForYourSoul.EditorTools
             player.tag = "Player";
 
             var spriteRenderer = player.AddComponent<SpriteRenderer>();
-            spriteRenderer.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(PlayerSpritePath);
+            spriteRenderer.sprite = definition != null ? definition.Sprite : LoadSprite(PlayerSpritePath);
             spriteRenderer.sortingLayerName = settings.EntitySortingLayer;
             spriteRenderer.sortingOrder = 0;
 
@@ -134,15 +159,19 @@ namespace BattleForYourSoul.EditorTools
 
             var collider = player.AddComponent<CapsuleCollider2D>();
             collider.direction = CapsuleDirection2D.Vertical;
-            collider.size = new Vector2(0.45f, 0.5f);
-            collider.offset = new Vector2(0f, 0.25f);
+            collider.size = definition != null ? definition.ColliderSize : new Vector2(0.45f, 0.5f);
+            collider.offset = definition != null ? definition.ColliderOffset : new Vector2(0f, 0.25f);
 
             player.AddComponent<PlayerInputReader>();
-            player.AddComponent<PlayerMovement>();
-            player.AddComponent<PlayerVisuals>();
+
+            var movement = player.AddComponent<PlayerMovement>();
+            SetSerializedReference(movement, "definition", definition);
+
+            var visuals = player.AddComponent<PlayerVisuals>();
+            SetSerializedReference(visuals, "definition", definition);
 
             var health = player.AddComponent<Health>();
-            SetSerializedFloat(health, "maxHealth", PlayerMaxHealth);
+            SetSerializedFloat(health, "maxHealth", definition != null ? definition.MaxHealth : PlayerMaxHealth);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(player, PlayerPrefabPath);
             Object.DestroyImmediate(player);
@@ -163,7 +192,7 @@ namespace BattleForYourSoul.EditorTools
             var visual = new GameObject("Visual");
             visual.transform.SetParent(enemy.transform, false);
             var spriteRenderer = visual.AddComponent<SpriteRenderer>();
-            spriteRenderer.sprite = definition != null ? definition.Sprite : AssetDatabase.LoadAssetAtPath<Sprite>(EnemySpritePath);
+            spriteRenderer.sprite = definition != null ? definition.Sprite : LoadSprite(EnemySpritePath);
             spriteRenderer.sortingLayerName = settings.EntitySortingLayer;
             spriteRenderer.sortingOrder = 0;
 
@@ -183,13 +212,14 @@ namespace BattleForYourSoul.EditorTools
             SetSerializedReference(enemyComponent, "health", health);
             SetSerializedReference(enemyComponent, "contactDamage", contactDamage);
             SetSerializedReference(enemyComponent, "spriteRenderer", spriteRenderer);
+            SetSerializedReference(enemyComponent, "bodyCollider", collider);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(enemy, EnemyPrefabPath);
             Object.DestroyImmediate(enemy);
             return prefab;
         }
 
-        private static GameObject EnsureProjectilePrefab(GameSettings settings)
+        private static GameObject EnsureProjectilePrefab(GameSettings settings, WeaponDefinition weaponDefinition)
         {
             if (AssetDatabase.LoadAssetAtPath<GameObject>(ProjectilePrefabPath) != null)
             {
@@ -200,7 +230,9 @@ namespace BattleForYourSoul.EditorTools
             projectile.layer = LayerMask.NameToLayer("Projectile");
 
             var spriteRenderer = projectile.AddComponent<SpriteRenderer>();
-            spriteRenderer.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(ProjectileSpritePath);
+            spriteRenderer.sprite = weaponDefinition != null && weaponDefinition.ProjectileSprite != null
+                ? weaponDefinition.ProjectileSprite
+                : LoadSprite(ProjectileSpritePath);
             spriteRenderer.sortingLayerName = settings.VfxSortingLayer;
             spriteRenderer.sortingOrder = 0;
 
@@ -214,7 +246,8 @@ namespace BattleForYourSoul.EditorTools
             collider.isTrigger = true;
             collider.radius = 0.12f;
 
-            projectile.AddComponent<Projectile>();
+            var projectileComponent = projectile.AddComponent<Projectile>();
+            SetSerializedReference(projectileComponent, "spriteRenderer", spriteRenderer);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(projectile, ProjectilePrefabPath);
             Object.DestroyImmediate(projectile);
@@ -223,65 +256,60 @@ namespace BattleForYourSoul.EditorTools
 
         private static WeaponDefinition EnsureWeaponDefinition()
         {
-            var definition = AssetDatabase.LoadAssetAtPath<WeaponDefinition>(WeaponDefinitionPath);
-            if (definition == null)
+            var (definition, created) = EnsureAsset<WeaponDefinition>(WeaponDefinitionPath);
+            if (created)
             {
-                definition = ScriptableObject.CreateInstance<WeaponDefinition>();
-                AssetDatabase.CreateAsset(definition, WeaponDefinitionPath);
+                EditorUtility.SetDirty(definition);
+                AssetDatabase.SaveAssets();
             }
 
-            EditorUtility.SetDirty(definition);
-            AssetDatabase.SaveAssets();
+            SeedReferenceIfMissing(definition, "projectileSprite", LoadSprite(ProjectileSpritePath));
             return definition;
         }
 
         private static EnemyDefinition EnsureEnemyDefinition()
         {
-            var definition = AssetDatabase.LoadAssetAtPath<EnemyDefinition>(EnemyDefinitionPath);
-            if (definition == null)
+            var (definition, created) = EnsureAsset<EnemyDefinition>(EnemyDefinitionPath);
+            if (created)
             {
-                definition = ScriptableObject.CreateInstance<EnemyDefinition>();
-                AssetDatabase.CreateAsset(definition, EnemyDefinitionPath);
+                EditorUtility.SetDirty(definition);
+                AssetDatabase.SaveAssets();
             }
 
-            SetSerializedReference(definition, "sprite", AssetDatabase.LoadAssetAtPath<Sprite>(EnemySpritePath));
-            EditorUtility.SetDirty(definition);
-            AssetDatabase.SaveAssets();
+            SeedReferenceIfMissing(definition, "sprite", LoadSprite(EnemySpritePath));
+            return definition;
+        }
+
+        private static PlayerDefinition EnsurePlayerDefinition(WeaponDefinition defaultWeapon)
+        {
+            var (definition, created) = EnsureAsset<PlayerDefinition>(PlayerDefinitionPath);
+            if (created)
+            {
+                EditorUtility.SetDirty(definition);
+                AssetDatabase.SaveAssets();
+            }
+
+            SeedReferenceIfMissing(definition, "sprite", LoadSprite(PlayerSpritePath));
+            SeedReferenceIfMissing(definition, "startingWeapon", defaultWeapon);
             return definition;
         }
 
         private static ProgressionDefinition EnsureProgressionDefinition()
         {
-            var progression = AssetDatabase.LoadAssetAtPath<ProgressionDefinition>(ProgressionDefinitionPath);
-            if (progression == null)
-            {
-                progression = ScriptableObject.CreateInstance<ProgressionDefinition>();
-                AssetDatabase.CreateAsset(progression, ProgressionDefinitionPath);
-            }
-
-            EditorUtility.SetDirty(progression);
-            AssetDatabase.SaveAssets();
+            var (progression, _) = EnsureAsset<ProgressionDefinition>(ProgressionDefinitionPath);
             return progression;
         }
 
         private static MonsterScaling EnsureMonsterScaling()
         {
-            var scaling = AssetDatabase.LoadAssetAtPath<MonsterScaling>(MonsterScalingPath);
-            if (scaling == null)
-            {
-                scaling = ScriptableObject.CreateInstance<MonsterScaling>();
-                AssetDatabase.CreateAsset(scaling, MonsterScalingPath);
-            }
-
-            EditorUtility.SetDirty(scaling);
-            AssetDatabase.SaveAssets();
+            var (scaling, _) = EnsureAsset<MonsterScaling>(MonsterScalingPath);
             return scaling;
         }
 
         private static UpgradeDefinition[] EnsureUpgrades()
         {
             EnsureFolder(UpgradesFolder);
-            Sprite icon = AssetDatabase.LoadAssetAtPath<Sprite>(UpgradeIconSpritePath);
+            Sprite icon = LoadSprite(UpgradeIconSpritePath);
 
             return new[]
             {
@@ -297,11 +325,10 @@ namespace BattleForYourSoul.EditorTools
         private static UpgradeDefinition EnsureUpgrade(string fileName, string id, string displayName, string description, Color32 color, Sprite icon, UpgradeStat stat, float value)
         {
             string path = $"{UpgradesFolder}/{fileName}.asset";
-            var upgrade = AssetDatabase.LoadAssetAtPath<UpgradeDefinition>(path);
-            if (upgrade == null)
+            var (upgrade, created) = EnsureAsset<UpgradeDefinition>(path);
+            if (!created)
             {
-                upgrade = ScriptableObject.CreateInstance<UpgradeDefinition>();
-                AssetDatabase.CreateAsset(upgrade, path);
+                return upgrade;
             }
 
             var serialized = new SerializedObject(upgrade);
@@ -323,6 +350,72 @@ namespace BattleForYourSoul.EditorTools
             return upgrade;
         }
 
+        private static UpgradePool EnsureUpgradePool(UpgradeDefinition[] upgrades)
+        {
+            var (pool, created) = EnsureAsset<UpgradePool>(UpgradePoolPath);
+            if (created)
+            {
+                SetSerializedArray(pool, "upgrades", upgrades);
+                EditorUtility.SetDirty(pool);
+                AssetDatabase.SaveAssets();
+            }
+
+            return pool;
+        }
+
+        private static StageDefinition[] EnsureStages(EnemyDefinition enemy)
+        {
+            EnsureFolder(StagesFolder);
+
+            return new[]
+            {
+                EnsureStage("Stage_01", "Stage 1", monsterLevel: 1, killsToAdvance: 12, spawnInterval: 1.2f, maxAlive: 30, enemy),
+                EnsureStage("Stage_02", "Stage 2", monsterLevel: 2, killsToAdvance: 15, spawnInterval: 1.0f, maxAlive: 36, enemy),
+                EnsureStage("Stage_03", "Stage 3", monsterLevel: 3, killsToAdvance: 18, spawnInterval: 0.85f, maxAlive: 44, enemy),
+            };
+        }
+
+        private static StageDefinition EnsureStage(string fileName, string displayName, int monsterLevel, int killsToAdvance, float spawnInterval, int maxAlive, EnemyDefinition enemy)
+        {
+            string path = $"{StagesFolder}/{fileName}.asset";
+            var (stage, created) = EnsureAsset<StageDefinition>(path);
+            if (!created)
+            {
+                return stage;
+            }
+
+            var serialized = new SerializedObject(stage);
+            serialized.FindProperty("displayName").stringValue = displayName;
+            serialized.FindProperty("monsterLevel").intValue = monsterLevel;
+            serialized.FindProperty("killsToAdvance").intValue = killsToAdvance;
+            serialized.FindProperty("spawnInterval").floatValue = spawnInterval;
+            serialized.FindProperty("maxAlive").intValue = maxAlive;
+
+            SerializedProperty roster = serialized.FindProperty("roster");
+            roster.arraySize = 1;
+            SerializedProperty entry = roster.GetArrayElementAtIndex(0);
+            entry.FindPropertyRelative("enemy").objectReferenceValue = enemy;
+            entry.FindPropertyRelative("weight").floatValue = 1f;
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(stage);
+            AssetDatabase.SaveAssets();
+            return stage;
+        }
+
+        private static StageProgression EnsureStageProgression(StageDefinition[] stages)
+        {
+            var (progression, created) = EnsureAsset<StageProgression>(StageProgressionPath);
+            if (created)
+            {
+                SetSerializedArray(progression, "stages", stages);
+                EditorUtility.SetDirty(progression);
+                AssetDatabase.SaveAssets();
+            }
+
+            return progression;
+        }
+
         private static void EnsureFolder(string path)
         {
             if (AssetDatabase.IsValidFolder(path))
@@ -334,22 +427,25 @@ namespace BattleForYourSoul.EditorTools
             AssetDatabase.CreateFolder(parent, System.IO.Path.GetFileName(path));
         }
 
+        private static Sprite LoadSprite(string path)
+        {
+            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        }
+
         private static TileBase EnsureTile(string name, string spritePath)
         {
             string tilePath = $"Assets/_Project/ScriptableObjects/{name}.asset";
-            var tile = AssetDatabase.LoadAssetAtPath<Tile>(tilePath);
-            if (tile == null)
+            var (tile, created) = EnsureAsset<Tile>(tilePath);
+            if (created)
             {
-                tile = ScriptableObject.CreateInstance<Tile>();
                 tile.name = name;
-                AssetDatabase.CreateAsset(tile, tilePath);
+                tile.sprite = LoadSprite(spritePath);
+                tile.color = Color.white;
+                tile.colliderType = Tile.ColliderType.None;
+                EditorUtility.SetDirty(tile);
+                AssetDatabase.SaveAssets();
             }
 
-            tile.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(spritePath);
-            tile.color = Color.white;
-            tile.colliderType = Tile.ColliderType.None;
-            EditorUtility.SetDirty(tile);
-            AssetDatabase.SaveAssets();
             return tile;
         }
 
@@ -385,7 +481,7 @@ namespace BattleForYourSoul.EditorTools
 
         private static void BuildObstacles(Transform parent, GameSettings settings)
         {
-            var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RockPath);
+            var sprite = LoadSprite(RockPath);
             var positions = new[]
             {
                 new Vector2(-2f, 1f),
@@ -458,12 +554,19 @@ namespace BattleForYourSoul.EditorTools
             return spawner;
         }
 
-        private static (Experience, LevelDirector) BuildProgression(GameObject player, EnemySpawner spawner, MonsterScaling scaling, ProgressionDefinition progression)
+        private static (Experience, LevelDirector) BuildProgression(
+            GameObject player,
+            EnemySpawner spawner,
+            MonsterScaling scaling,
+            ProgressionDefinition progression,
+            StageProgression stageProgression,
+            PlayerDefinition playerDefinition)
         {
             var experience = player.AddComponent<Experience>();
             SetSerializedReference(experience, "progression", progression);
 
             var stats = player.AddComponent<PlayerStats>();
+            SetSerializedReference(stats, "definition", playerDefinition);
             SetSerializedReference(stats, "health", player.GetComponent<Health>());
             SetSerializedReference(stats, "weapon", player.GetComponent<WeaponController>());
             SetSerializedReference(stats, "movement", player.GetComponent<PlayerMovement>());
@@ -474,6 +577,7 @@ namespace BattleForYourSoul.EditorTools
             var director = directorGo.AddComponent<LevelDirector>();
             SetSerializedReference(director, "spawner", spawner);
             SetSerializedReference(director, "scaling", scaling);
+            SetSerializedReference(director, "progression", stageProgression);
             SetSerializedReference(spawner, "levelDirector", director);
 
             var granterGo = new GameObject("Kill XP Granter");
@@ -484,7 +588,7 @@ namespace BattleForYourSoul.EditorTools
             return (experience, director);
         }
 
-        private static void BuildHud(GameObject player, EnemySpawner spawner, Experience experience, LevelDirector levelDirector, UpgradeDefinition[] upgrades)
+        private static void BuildHud(GameObject player, EnemySpawner spawner, Experience experience, LevelDirector levelDirector, UpgradePool upgradePool)
         {
             var canvasGo = new GameObject("HUD", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = canvasGo.GetComponent<Canvas>();
@@ -653,8 +757,8 @@ namespace BattleForYourSoul.EditorTools
             SetSerializedReference(levelUp, "stats", player.GetComponent<PlayerStats>());
             SetSerializedReference(levelUp, "playerHealth", player.GetComponent<Health>());
             SetSerializedReference(levelUp, "panel", levelPanel.gameObject);
+            SetSerializedReference(levelUp, "pool", upgradePool);
             SetSerializedArray(levelUp, "cards", cards);
-            SetSerializedArray(levelUp, "upgrades", upgrades);
         }
 
         private static UpgradeCardView CreateUpgradeCard(Transform parent, Font font, Vector2 anchoredPosition)
@@ -807,6 +911,31 @@ namespace BattleForYourSoul.EditorTools
 
             property.objectReferenceValue = value;
             serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>
+        /// Assigns a serialized reference only when it is currently empty. Used for wiring the builder
+        /// needs but a designer may override: a missing value is filled, an authored one is kept.
+        /// </summary>
+        private static void SeedReferenceIfMissing(Object target, string propertyName, Object value)
+        {
+            var serialized = new SerializedObject(target);
+            SerializedProperty property = serialized.FindProperty(propertyName);
+            if (property == null)
+            {
+                Debug.LogError($"[GameSceneBuilder] No serialized property '{propertyName}' on {target.GetType().Name}.");
+                return;
+            }
+
+            if (property.objectReferenceValue != null)
+            {
+                return;
+            }
+
+            property.objectReferenceValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(target);
+            AssetDatabase.SaveAssets();
         }
 
         private static void SetSerializedFloat(Object target, string propertyName, float value)
