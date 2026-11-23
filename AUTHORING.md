@@ -41,6 +41,23 @@ These were established with the first milestones and apply to every new system:
 - **Isometric sorting is centralised.** `IsometricSpriteSorter` derives depth from world position;
   never assign arbitrary fixed per-sprite sort orders.
 
+## Continuous integration
+
+`.github/workflows/tests.yml` runs both test suites on every pull request and on pushes to `main`.
+The job fails if either suite has a failing test, so its `Tests / Unity tests` check is the merge
+gate for `main`.
+
+The workflow uses the official Unity CLI and needs three repository secrets:
+
+| Secret | Where to get it |
+|---|---|
+| `UNITY_SERVICE_ACCOUNT_ID` | Unity Cloud ▸ Administration ▸ Service accounts ▸ Keys |
+| `UNITY_SERVICE_ACCOUNT_SECRET` | Same key, second half |
+| `UNITY_LICENSE_SERIAL` | The Unity license serial used to activate the Editor in CI |
+
+Without these, the Editor cannot be activated and the check stays red. JUnit reports from both
+suites are uploaded as the `test-results` artifact on every run.
+
 ## Where things live
 
 | What you want to change | Asset | Notes |

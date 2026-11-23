@@ -49,6 +49,9 @@ Examples of good one-line messages:
 
 - Keep `What` and `Why` aligned one-to-one: every `What` bullet has a matching `Why` bullet.
 - Do not use the old `## What's included` / `## Verified` / `## Notes` layout.
+- A PR can be merged into `main` only when the `Tests / Unity tests` check from
+  `.github/workflows/tests.yml` is green and the branch is up to date with `main`. Never bypass the
+  rule or merge with a red or missing check.
 
 Skeleton:
 

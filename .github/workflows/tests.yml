@@ -1,0 +1,129 @@
+# Unity test pipeline. Both suites must pass for the "Tests / Unity tests" check
+# to go green; main is protected by a ruleset that requires that check.
+#
+# Repository secrets needed under Settings -> Secrets and variables -> Actions:
+#   UNITY_SERVICE_ACCOUNT_ID      Unity Cloud service-account key ID
+#   UNITY_SERVICE_ACCOUNT_SECRET  Unity Cloud service-account key secret
+#   UNITY_LICENSE_SERIAL          Unity license serial used to activate the Editor
+#
+# The CLI reads these from the environment; they are never passed on a command line.
+
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unity-tests:
+    name: Unity tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: '.'
+
+    env:
+      UNITY_FORMAT: github
+      UNITY_NON_INTERACTIVE: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mask credentials in logs
+        env:
+          UNITY_SERVICE_ACCOUNT_ID: ${{ secrets.UNITY_SERVICE_ACCOUNT_ID }}
+          UNITY_SERVICE_ACCOUNT_SECRET: ${{ secrets.UNITY_SERVICE_ACCOUNT_SECRET }}
+          UNITY_LICENSE_SERIAL: ${{ secrets.UNITY_LICENSE_SERIAL }}
+        run: |
+          echo "::add-mask::$UNITY_SERVICE_ACCOUNT_ID"
+          echo "::add-mask::$UNITY_SERVICE_ACCOUNT_SECRET"
+          echo "::add-mask::$UNITY_LICENSE_SERIAL"
+
+      - name: Install the Unity CLI
+        run: |
+          curl -fsSL https://unity.com/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Restore the Unity download cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.config/unityhub/downloads
+          key: unity-downloads-6000.6.9f1
+
+      - name: Compute the Library cache key
+        id: cache-key
+        run: echo "key=$(unity cache key --target StandaloneLinux64)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the project Library folder
+        uses: actions/cache@v4
+        with:
+          path: './Library'
+          key: unity-library-${{ steps.cache-key.outputs.key }}
+
+      - name: Install the Editor's runtime libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libgl1 libglu1-mesa libgtk-3-0t64 libnss3 \
+            libasound2t64 libgbm1 libdrm2 libxtst6 \
+            libxrandr2 libxcursor1 libxcomposite1 libxdamage1 \
+            libxfixes3 libxi6 libxrender1 libxext6 \
+            libsm6 libice6 libxkbcommon0 libpango-1.0-0 \
+            libpangocairo-1.0-0 libcairo2 libgdk-pixbuf-2.0-0 libatk1.0-0t64 \
+            libatk-bridge2.0-0t64 libcups2t64 libdbus-1-3 libnotify4 \
+            libsecret-1-0
+
+      - name: Install the Unity Editor
+        env:
+          UNITY_SERVICE_ACCOUNT_ID: ${{ secrets.UNITY_SERVICE_ACCOUNT_ID }}
+          UNITY_SERVICE_ACCOUNT_SECRET: ${{ secrets.UNITY_SERVICE_ACCOUNT_SECRET }}
+        run: unity install 6000.6.9f1 --yes --accept-eula
+
+      - name: Activate the Unity license
+        env:
+          UNITY_LICENSE_SERIAL: ${{ secrets.UNITY_LICENSE_SERIAL }}
+        run: unity license activate
+
+      - name: Preflight
+        env:
+          UNITY_SERVICE_ACCOUNT_ID: ${{ secrets.UNITY_SERVICE_ACCOUNT_ID }}
+          UNITY_SERVICE_ACCOUNT_SECRET: ${{ secrets.UNITY_SERVICE_ACCOUNT_SECRET }}
+        run: unity doctor --ci
+
+      - name: Run EditMode tests
+        env:
+          UNITY_SERVICE_ACCOUNT_ID: ${{ secrets.UNITY_SERVICE_ACCOUNT_ID }}
+          UNITY_SERVICE_ACCOUNT_SECRET: ${{ secrets.UNITY_SERVICE_ACCOUNT_SECRET }}
+        run: unity test --mode EditMode --report-format junit --output test-results-editmode.xml
+
+      - name: Run PlayMode tests
+        env:
+          UNITY_SERVICE_ACCOUNT_ID: ${{ secrets.UNITY_SERVICE_ACCOUNT_ID }}
+          UNITY_SERVICE_ACCOUNT_SECRET: ${{ secrets.UNITY_SERVICE_ACCOUNT_SECRET }}
+        run: unity test --mode PlayMode --report-format junit --output test-results-playmode.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            test-results-editmode.xml
+            test-results-playmode.xml
+          if-no-files-found: warn
+
+      - name: Return the Unity license
+        if: always()
+        continue-on-error: true
+        env:
+          UNITY_SERVICE_ACCOUNT_ID: ${{ secrets.UNITY_SERVICE_ACCOUNT_ID }}
+          UNITY_SERVICE_ACCOUNT_SECRET: ${{ secrets.UNITY_SERVICE_ACCOUNT_SECRET }}
+        run: unity license return --yes
