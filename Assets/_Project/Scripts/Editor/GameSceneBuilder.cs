@@ -13,6 +13,8 @@ using BattleForYourSoul.Enemies;
 using BattleForYourSoul.Player;
 using BattleForYourSoul.Progression;
 using BattleForYourSoul.UI;
+using BattleForYourSoul.VFX;
+using BattleForYourSoul.Weapons;
 using BattleForYourSoul.World;
 
 namespace BattleForYourSoul.EditorTools
@@ -39,7 +41,10 @@ namespace BattleForYourSoul.EditorTools
         private const string PlayerPrefabPath = "Assets/_Project/Prefabs/Player.prefab";
         private const string EnemyPrefabPath = "Assets/_Project/Prefabs/Enemy.prefab";
         private const string ProjectilePrefabPath = "Assets/_Project/Prefabs/Projectile.prefab";
+        private const string AttackVfxPrefabPath = "Assets/_Project/Prefabs/AttackVfx.prefab";
         private const string WeaponDefinitionPath = "Assets/_Project/ScriptableObjects/Weapon_Default.asset";
+        private const string WeaponsFolder = "Assets/_Project/ScriptableObjects/Weapons";
+        private const string WeaponActionsFolder = "Assets/_Project/ScriptableObjects/Weapons/Actions";
         private const string EnemyDefinitionPath = "Assets/_Project/ScriptableObjects/Enemy_Grunt.asset";
         private const string PlayerDefinitionPath = "Assets/_Project/ScriptableObjects/Player_Default.asset";
         private const string ProgressionDefinitionPath = "Assets/_Project/ScriptableObjects/Progression_Default.asset";
@@ -56,6 +61,12 @@ namespace BattleForYourSoul.EditorTools
         private const string PlayerSpritePath = "Assets/_Project/Art/Characters/Player.png";
         private const string EnemySpritePath = "Assets/_Project/Art/Characters/Enemy_Grunt.png";
         private const string ProjectileSpritePath = "Assets/_Project/Art/VFX/Projectile_Bolt.png";
+        private const string ArrowSpritePath = "Assets/_Project/Art/VFX/Projectile_Arrow.png";
+        private const string SlashVfxSpritePath = "Assets/_Project/Art/VFX/VFX_Slash.png";
+        private const string ThrustVfxSpritePath = "Assets/_Project/Art/VFX/VFX_Thrust.png";
+        private const string SwordSpritePath = "Assets/_Project/Art/Items/Weapon_Sword.png";
+        private const string SpearSpritePath = "Assets/_Project/Art/Items/Weapon_Spear.png";
+        private const string BowSpritePath = "Assets/_Project/Art/Items/Weapon_Bow.png";
         private const string UpgradeIconSpritePath = "Assets/_Project/Art/UI/Upgrade_Icon.png";
         private const string DoorClosedSpritePath = "Assets/_Project/Art/Environment/Door_Closed.png";
         private const string DoorOpenSpritePath = "Assets/_Project/Art/Environment/Door_Open.png";
@@ -72,25 +83,30 @@ namespace BattleForYourSoul.EditorTools
             // come back as a "fake null". Loading assets after the scene switch keeps them valid.
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
+            // Placeholder art must exist before any asset seeding: newly added sprites are loaded by
+            // the weapon/action seeders below, and LoadSprite would otherwise cache a null reference.
+            EnsurePlaceholderSprites();
+
             GameSettings settings = EnsureSettings();
-            WeaponDefinition defaultWeapon = EnsureWeaponDefinition();
+            WeaponActions actions = EnsureWeaponActions();
+            WeaponDefinition[] weapons = EnsureWeapons(actions);
+            EnsureLegacyWeaponDefinition(actions);
             EnemyDefinition enemyDefinition = EnsureEnemyDefinition();
-            PlayerDefinition playerDefinition = EnsurePlayerDefinition(defaultWeapon);
+            PlayerDefinition playerDefinition = EnsurePlayerDefinition(weapons.Length > 0 ? weapons[0] : null);
             ProgressionDefinition progression = EnsureProgressionDefinition();
             MonsterScaling scaling = EnsureMonsterScaling();
 
             var categories = EnsureUpgradeCategories();
-            UpgradeDefinition[] upgrades = EnsureUpgrades(categories.shots, categories.mobility, categories.vitality);
+            UpgradeDefinition[] upgrades = EnsureUpgrades(categories.shots, categories.mobility, categories.vitality, weapons);
             UpgradePool upgradePool = EnsureUpgradePool(upgrades);
             StageDefinition[] stages = EnsureStages(enemyDefinition);
             StageProgression stageProgression = EnsureStageProgression(stages);
 
-            // A player asset may name its own starting weapon; fall back to the default one.
-            WeaponDefinition weaponDefinition = playerDefinition.StartingWeapon != null ? playerDefinition.StartingWeapon : defaultWeapon;
-
             GameObject playerPrefab = EnsurePlayerPrefab(settings, playerDefinition);
             GameObject enemyPrefab = EnsureEnemyPrefab(settings, enemyDefinition);
-            GameObject projectilePrefab = EnsureProjectilePrefab(settings, weaponDefinition);
+            Sprite projectileSprite = actions.BowShot != null ? actions.BowShot.ProjectileSprite : LoadSprite(ProjectileSpritePath);
+            GameObject projectilePrefab = EnsureProjectilePrefab(settings, projectileSprite);
+            GameObject attackVfxPrefab = EnsureAttackVfxPrefab(settings);
 
             TileBase floorA = EnsureTile("Tile_Floor_A", FloorTileAPath);
             TileBase floorB = EnsureTile("Tile_Floor_B", FloorTileBPath);
@@ -105,15 +121,15 @@ namespace BattleForYourSoul.EditorTools
             player.name = "Player";
             player.transform.position = new Vector3(settings.RoomEntrance.x, settings.RoomEntrance.y, 0f);
 
-            EnemySpawner spawner = BuildCombat(player, weaponDefinition, enemyDefinition, enemyPrefab, projectilePrefab);
+            (EnemySpawner spawner, WeaponSelection selection) = BuildCombat(player, enemyDefinition, enemyPrefab, projectilePrefab, attackVfxPrefab, weapons, settings);
             (Experience experience, LevelDirector levelDirector) = BuildProgression(player, spawner, scaling, progression, stageProgression, playerDefinition);
 
             StageDoor[] doors = BuildDoors(environment.transform, settings, categories, levelDirector);
             CameraFollow cameraFollow = BuildCamera(player.transform, settings);
             BuildLight();
-            LevelUpController levelUp = BuildHud(player, spawner, experience, levelDirector, upgradePool);
+            LevelUpController levelUp = BuildHud(player, spawner, experience, levelDirector, upgradePool, selection);
 
-            WireDirector(levelDirector, settings, player, cameraFollow, levelUp, doors);
+            WireDirector(levelDirector, settings, player, cameraFollow, levelUp, doors, selection);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, GameScenePath);
@@ -162,6 +178,28 @@ namespace BattleForYourSoul.EditorTools
                 for (int i = 0; i < defaults.Length; i++)
                 {
                     doors.GetArrayElementAtIndex(i).vector2Value = defaults[i];
+                }
+
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(settings);
+                AssetDatabase.SaveAssets();
+            }
+
+            // Samsara's props are a new required fixture; backfill them without touching authored doors.
+            var pedestals = serialized.FindProperty("weaponPedestalPositions");
+            if (pedestals != null && pedestals.arraySize == 0)
+            {
+                var defaults = new[]
+                {
+                    new Vector2(-4f, -1.2f),
+                    new Vector2(0f, -1.8f),
+                    new Vector2(4f, -1.2f),
+                };
+
+                pedestals.arraySize = defaults.Length;
+                for (int i = 0; i < defaults.Length; i++)
+                {
+                    pedestals.GetArrayElementAtIndex(i).vector2Value = defaults[i];
                 }
 
                 serialized.ApplyModifiedPropertiesWithoutUndo();
@@ -287,7 +325,7 @@ namespace BattleForYourSoul.EditorTools
             return prefab;
         }
 
-        private static GameObject EnsureProjectilePrefab(GameSettings settings, WeaponDefinition weaponDefinition)
+        private static GameObject EnsureProjectilePrefab(GameSettings settings, Sprite projectileSprite)
         {
             if (AssetDatabase.LoadAssetAtPath<GameObject>(ProjectilePrefabPath) != null)
             {
@@ -298,9 +336,7 @@ namespace BattleForYourSoul.EditorTools
             projectile.layer = LayerMask.NameToLayer("Projectile");
 
             var spriteRenderer = projectile.AddComponent<SpriteRenderer>();
-            spriteRenderer.sprite = weaponDefinition != null && weaponDefinition.ProjectileSprite != null
-                ? weaponDefinition.ProjectileSprite
-                : LoadSprite(ProjectileSpritePath);
+            spriteRenderer.sprite = projectileSprite != null ? projectileSprite : LoadSprite(ProjectileSpritePath);
             spriteRenderer.sortingLayerName = settings.VfxSortingLayer;
             spriteRenderer.sortingOrder = 0;
 
@@ -322,17 +358,168 @@ namespace BattleForYourSoul.EditorTools
             return prefab;
         }
 
-        private static WeaponDefinition EnsureWeaponDefinition()
+        /// <summary>
+        /// Builds the shared one-shot effect prefab. It sits on the VFX layer and uses the same
+        /// world-Y sorting rule as every other sprite, with a small offset so it draws in front.
+        /// </summary>
+        private static GameObject EnsureAttackVfxPrefab(GameSettings settings)
         {
-            var (definition, created) = EnsureAsset<WeaponDefinition>(WeaponDefinitionPath);
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(AttackVfxPrefabPath) != null)
+            {
+                AssetDatabase.DeleteAsset(AttackVfxPrefabPath);
+            }
+
+            var effect = new GameObject("AttackVfx");
+
+            var spriteRenderer = effect.AddComponent<SpriteRenderer>();
+            spriteRenderer.sprite = LoadSprite(SlashVfxSpritePath);
+            spriteRenderer.sortingLayerName = settings.VfxSortingLayer;
+            spriteRenderer.sortingOrder = 0;
+
+            var sorter = effect.AddComponent<IsometricSpriteSorter>();
+            SetSerializedReference(sorter, "targetRenderer", spriteRenderer);
+            SetSerializedInt(sorter, "orderOffset", 10);
+
+            var attackVfx = effect.AddComponent<AttackVfx>();
+            SetSerializedReference(attackVfx, "spriteRenderer", spriteRenderer);
+
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(effect, AttackVfxPrefabPath);
+            Object.DestroyImmediate(effect);
+            return prefab;
+        }
+
+        private struct WeaponActions
+        {
+            public WeaponActionDefinition SwordSlash;
+            public WeaponActionDefinition SwordCleave;
+            public WeaponActionDefinition SpearThrust;
+            public WeaponActionDefinition SpearSweep;
+            public WeaponActionDefinition BowShot;
+            public WeaponActionDefinition BowSpread;
+        }
+
+        private static WeaponActions EnsureWeaponActions()
+        {
+            EnsureFolder(WeaponActionsFolder);
+
+            return new WeaponActions
+            {
+                SwordSlash = EnsureWeaponAction("Action_Sword_Slash", "Slash", WeaponAttackShape.MeleeArc, 0.42f, 2f, 1.2f, 110f, 0.4f, 1, 0f, 14f, 1f, null, LoadSprite(SlashVfxSpritePath), new Color32(250, 250, 255, 255), 1.6f, 0.18f, 90f),
+                SwordCleave = EnsureWeaponAction("Action_Sword_Cleave", "Cleave", WeaponAttackShape.MeleeArc, 1.4f, 3f, 1.5f, 200f, 0.4f, 1, 0f, 14f, 1f, null, LoadSprite(SlashVfxSpritePath), new Color32(255, 238, 210, 255), 2.2f, 0.24f, 160f),
+                SpearThrust = EnsureWeaponAction("Action_Spear_Thrust", "Thrust", WeaponAttackShape.Line, 0.5f, 2f, 2f, 360f, 0.35f, 1, 0f, 14f, 1f, null, LoadSprite(ThrustVfxSpritePath), new Color32(238, 248, 255, 255), 2.2f, 0.16f, 0f),
+                SpearSweep = EnsureWeaponAction("Action_Spear_Sweep", "Sweep", WeaponAttackShape.Line, 1.5f, 3f, 2.4f, 360f, 0.9f, 1, 0f, 14f, 1f, null, LoadSprite(ThrustVfxSpritePath), new Color32(255, 240, 210, 255), 2.8f, 0.22f, 0f),
+                BowShot = EnsureWeaponAction("Action_Bow_Shot", "Shot", WeaponAttackShape.Projectile, 0.34f, 1f, 8f, 360f, 0.4f, 1, 0f, 15f, 1.1f, LoadSprite(ArrowSpritePath), null, Color.white, 1.4f, 0.22f, 0f),
+                BowSpread = EnsureWeaponAction("Action_Bow_Spread", "Spread", WeaponAttackShape.Projectile, 1.5f, 1f, 8f, 360f, 0.4f, 2, 22f, 12f, 1f, LoadSprite(ArrowSpritePath), null, Color.white, 1.4f, 0.22f, 0f),
+            };
+        }
+
+        private static WeaponActionDefinition EnsureWeaponAction(
+            string fileName,
+            string displayName,
+            WeaponAttackShape shape,
+            float cooldown,
+            float damage,
+            float range,
+            float arcDegrees,
+            float lineWidth,
+            int projectilesPerShot,
+            float spreadDegrees,
+            float projectileSpeed,
+            float projectileLifetime,
+            Sprite projectileSprite,
+            Sprite hitVfxSprite,
+            Color hitVfxColor,
+            float hitVfxSize,
+            float hitVfxDuration,
+            float hitVfxSweep)
+        {
+            string path = $"{WeaponActionsFolder}/{fileName}.asset";
+            var (action, created) = EnsureAsset<WeaponActionDefinition>(path);
+
+            // Placeholder art may have been generated after a previous build seeded this action, so
+            // backfill missing references without overwriting anything a designer has authored.
+            if (projectileSprite != null)
+            {
+                SeedReferenceIfMissing(action, "projectileSprite", projectileSprite);
+            }
+
+            SeedHitVfxFields(action, hitVfxSprite, hitVfxColor, hitVfxSize, hitVfxDuration, hitVfxSweep);
+
+            if (!created)
+            {
+                return action;
+            }
+
+            var serialized = new SerializedObject(action);
+            serialized.FindProperty("displayName").stringValue = displayName;
+            serialized.FindProperty("shape").enumValueIndex = (int)shape;
+            serialized.FindProperty("cooldown").floatValue = cooldown;
+            serialized.FindProperty("damage").floatValue = damage;
+            serialized.FindProperty("range").floatValue = range;
+            serialized.FindProperty("arcDegrees").floatValue = arcDegrees;
+            serialized.FindProperty("lineWidth").floatValue = lineWidth;
+            serialized.FindProperty("projectilesPerShot").intValue = projectilesPerShot;
+            serialized.FindProperty("spreadDegrees").floatValue = spreadDegrees;
+            serialized.FindProperty("projectileSpeed").floatValue = projectileSpeed;
+            serialized.FindProperty("projectileLifetime").floatValue = projectileLifetime;
+            serialized.FindProperty("projectileSprite").objectReferenceValue = projectileSprite;
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(action);
+            AssetDatabase.SaveAssets();
+            return action;
+        }
+
+        private static WeaponDefinition[] EnsureWeapons(WeaponActions actions)
+        {
+            EnsureFolder(WeaponsFolder);
+
+            return new[]
+            {
+                EnsureWeapon("Weapon_Sword", "sword", "Sword", "Close-range slash and a wide cleave.",
+                    SwordSpritePath, actions.SwordSlash, actions.SwordCleave),
+                EnsureWeapon("Weapon_Spear", "spear", "Spear", "A two-block thrust and a broad sweep.",
+                    SpearSpritePath, actions.SpearThrust, actions.SpearSweep),
+                EnsureWeapon("Weapon_Bow", "bow", "Bow", "Long-range shot and a spread volley.",
+                    BowSpritePath, actions.BowShot, actions.BowSpread),
+            };
+        }
+
+        private static WeaponDefinition EnsureWeapon(
+            string fileName,
+            string id,
+            string displayName,
+            string description,
+            string spritePath,
+            WeaponActionDefinition primary,
+            WeaponActionDefinition special)
+        {
+            string path = $"{WeaponsFolder}/{fileName}.asset";
+            var (weapon, created) = EnsureAsset<WeaponDefinition>(path);
             if (created)
             {
-                EditorUtility.SetDirty(definition);
+                var serialized = new SerializedObject(weapon);
+                serialized.FindProperty("id").stringValue = id;
+                serialized.FindProperty("displayName").stringValue = displayName;
+                serialized.FindProperty("description").stringValue = description;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(weapon);
                 AssetDatabase.SaveAssets();
             }
 
-            SeedReferenceIfMissing(definition, "projectileSprite", LoadSprite(ProjectileSpritePath));
-            return definition;
+            // Newly required references are backfilled so older assets keep their authored values.
+            SeedReferenceIfMissing(weapon, "pickupSprite", LoadSprite(spritePath));
+            SeedReferenceIfMissing(weapon, "primaryAction", primary);
+            SeedReferenceIfMissing(weapon, "specialAction", special);
+            return weapon;
+        }
+
+        private static void EnsureLegacyWeaponDefinition(WeaponActions actions)
+        {
+            var (definition, _) = EnsureAsset<WeaponDefinition>(WeaponDefinitionPath);
+            SeedReferenceIfMissing(definition, "primaryAction", actions.BowShot);
+            SeedReferenceIfMissing(definition, "specialAction", actions.BowSpread);
+            SeedReferenceIfMissing(definition, "pickupSprite", LoadSprite(BowSpritePath));
         }
 
         private static EnemyDefinition EnsureEnemyDefinition()
@@ -377,7 +564,8 @@ namespace BattleForYourSoul.EditorTools
         private static UpgradeDefinition[] EnsureUpgrades(
             UpgradeCategoryDefinition shots,
             UpgradeCategoryDefinition mobility,
-            UpgradeCategoryDefinition vitality)
+            UpgradeCategoryDefinition vitality,
+            WeaponDefinition[] weapons)
         {
             EnsureFolder(UpgradesFolder);
             Sprite icon = LoadSprite(UpgradeIconSpritePath);
@@ -396,9 +584,27 @@ namespace BattleForYourSoul.EditorTools
                 EnsureUpgrade("Upgrade_Vitality", "vitality", "Vitality", "Gain 20 max health.", new Color32(240, 120, 168, 255), icon, vitality, UpgradeStat.MaxHealthFlat, 20f),
                 EnsureUpgrade("Upgrade_IronWill", "iron-will", "Iron Will", "Gain 14 max health.", new Color32(250, 150, 180, 255), icon, vitality, UpgradeStat.MaxHealthFlat, 14f),
                 EnsureUpgrade("Upgrade_ToughSkin", "tough-skin", "Tough Skin", "Gain 12 max health.", new Color32(232, 160, 190, 255), icon, vitality, UpgradeStat.MaxHealthFlat, 12f),
+
+                // Weapon-specific placeholders: each weapon has three so a filtered choice stays full.
+                EnsureUpgrade("Upgrade_Bow_Split", "bow-split", "Split Arrow", "Fire one additional arrow.", new Color32(244, 176, 96, 255), icon, shots, UpgradeStat.ExtraProjectiles, 1f, weaponFilter(weapons,2)),
+                EnsureUpgrade("Upgrade_Bow_Ricochet", "bow-ricochet", "Ricochet", "Arrows bounce to one more target.", new Color32(252, 200, 120, 255), icon, shots, UpgradeStat.RicochetBounces, 1f, weaponFilter(weapons,2)),
+                EnsureUpgrade("Upgrade_Bow_Impact", "bow-impact", "Explosive Tip", "Hits burst in a small area.", new Color32(248, 148, 104, 255), icon, shots, UpgradeStat.ImpactRadius, 0.35f, weaponFilter(weapons,2)),
+
+                EnsureUpgrade("Upgrade_Sword_Reach", "sword-reach", "Longer Slash", "Sword attacks reach half a block further.", new Color32(212, 172, 236, 255), icon, vitality, UpgradeStat.RangeFlat, 0.5f, weaponFilter(weapons,0)),
+                EnsureUpgrade("Upgrade_Sword_Impact", "sword-impact", "Impact Wave", "Sword hits leave a small area of impact.", new Color32(228, 144, 220, 255), icon, vitality, UpgradeStat.ImpactRadius, 0.3f, weaponFilter(weapons,0)),
+                EnsureUpgrade("Upgrade_Sword_Edge", "sword-edge", "Keen Edge", "Sword attacks deal one more damage.", new Color32(238, 196, 248, 255), icon, vitality, UpgradeStat.DamageFlat, 1f, weaponFilter(weapons,0)),
+
+                EnsureUpgrade("Upgrade_Spear_Reach", "spear-reach", "Long Reach", "Spear attacks reach half a block further.", new Color32(132, 236, 176, 255), icon, mobility, UpgradeStat.RangeFlat, 0.5f, weaponFilter(weapons,1)),
+                EnsureUpgrade("Upgrade_Spear_Broadhead", "spear-broadhead", "Broadhead", "Spear attacks deal 20% more damage.", new Color32(160, 244, 196, 255), icon, mobility, UpgradeStat.DamagePercent, 20f, weaponFilter(weapons,1)),
+                EnsureUpgrade("Upgrade_Spear_Quick", "spear-quick", "Quick Thrust", "Spear attacks recover 15% faster.", new Color32(184, 248, 212, 255), icon, mobility, UpgradeStat.FireRatePercent, 15f, weaponFilter(weapons,1)),
             };
 
             return upgrades;
+        }
+
+        private static WeaponDefinition[] weaponFilter(WeaponDefinition[] weapons, int index)
+        {
+            return weapons != null && index < weapons.Length ? new[] { weapons[index] } : new WeaponDefinition[0];
         }
 
         private static UpgradeDefinition EnsureUpgrade(
@@ -412,6 +618,21 @@ namespace BattleForYourSoul.EditorTools
             UpgradeStat stat,
             float value)
         {
+            return EnsureUpgrade(fileName, id, displayName, description, color, icon, category, stat, value, null);
+        }
+
+        private static UpgradeDefinition EnsureUpgrade(
+            string fileName,
+            string id,
+            string displayName,
+            string description,
+            Color32 color,
+            Sprite icon,
+            UpgradeCategoryDefinition category,
+            UpgradeStat stat,
+            float value,
+            WeaponDefinition[] weaponFilter)
+        {
             string path = $"{UpgradesFolder}/{fileName}.asset";
             var (upgrade, created) = EnsureAsset<UpgradeDefinition>(path);
 
@@ -420,6 +641,11 @@ namespace BattleForYourSoul.EditorTools
 
             if (!created)
             {
+                if (weaponFilter != null && weaponFilter.Length > 0)
+                {
+                    SeedArrayIfEmpty(upgrade, "weaponFilter", weaponFilter);
+                }
+
                 return upgrade;
             }
 
@@ -435,6 +661,8 @@ namespace BattleForYourSoul.EditorTools
             SerializedProperty element = modifiers.GetArrayElementAtIndex(0);
             element.FindPropertyRelative("stat").enumValueIndex = (int)stat;
             element.FindPropertyRelative("value").floatValue = value;
+
+            SetSerializedArray(upgrade, "weaponFilter", weaponFilter ?? new WeaponDefinition[0]);
 
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(upgrade);
@@ -492,13 +720,21 @@ namespace BattleForYourSoul.EditorTools
 
             return new[]
             {
+                EnsureStage("Stage_Samsara", "Samsara", 1, enemy, new Vector2[0], true, new[] { 1 }),
                 EnsureStage("Stage_01", "Stage 1", 1, enemy, stageOne),
                 EnsureStage("Stage_02", "Stage 2", 2, enemy, stageTwo),
                 EnsureStage("Stage_03", "Stage 3", 3, enemy, stageThree),
             };
         }
 
-        private static StageDefinition EnsureStage(string fileName, string displayName, int monsterLevel, EnemyDefinition enemy, Vector2[] positions)
+        private static StageDefinition EnsureStage(
+            string fileName,
+            string displayName,
+            int monsterLevel,
+            EnemyDefinition enemy,
+            Vector2[] positions,
+            bool weaponSelectionStage = false,
+            int[] activeDoorIndices = null)
         {
             string path = $"{StagesFolder}/{fileName}.asset";
             var (stage, created) = EnsureAsset<StageDefinition>(path);
@@ -509,12 +745,24 @@ namespace BattleForYourSoul.EditorTools
             {
                 serialized.FindProperty("displayName").stringValue = displayName;
                 serialized.FindProperty("monsterLevel").intValue = monsterLevel;
+                serialized.FindProperty("weaponSelectionStage").boolValue = weaponSelectionStage;
+                if (activeDoorIndices != null)
+                {
+                    var indices = serialized.FindProperty("activeDoorIndices");
+                    indices.arraySize = activeDoorIndices.Length;
+                    for (int i = 0; i < activeDoorIndices.Length; i++)
+                    {
+                        indices.GetArrayElementAtIndex(i).intValue = activeDoorIndices[i];
+                    }
+                }
+
                 dirty = true;
             }
 
             // Older stages used timed waves; backfill their fixed encounter when it is still empty.
+            // Samsara deliberately stays empty, so it must never receive default enemies.
             SerializedProperty placements = serialized.FindProperty("enemyPlacements");
-            if (placements != null && placements.arraySize == 0)
+            if (!weaponSelectionStage && placements != null && placements.arraySize == 0)
             {
                 placements.arraySize = positions.Length;
                 for (int i = 0; i < positions.Length; i++)
@@ -546,6 +794,36 @@ namespace BattleForYourSoul.EditorTools
                 SetSerializedArray(progression, "stages", stages);
                 EditorUtility.SetDirty(progression);
                 AssetDatabase.SaveAssets();
+                return progression;
+            }
+
+            // Runs must start in Samsara. Insert it once if an existing progression predates it,
+            // without reordering or overwriting any stage the designer has authored since.
+            StageDefinition intro = stages.Length > 0 ? stages[0] : null;
+            if (intro == null)
+            {
+                return progression;
+            }
+
+            var serialized = new SerializedObject(progression);
+            SerializedProperty property = serialized.FindProperty("stages");
+            bool present = false;
+            for (int i = 0; i < property.arraySize; i++)
+            {
+                if (property.GetArrayElementAtIndex(i).objectReferenceValue == intro)
+                {
+                    present = true;
+                    break;
+                }
+            }
+
+            if (!present)
+            {
+                property.InsertArrayElementAtIndex(0);
+                property.GetArrayElementAtIndex(0).objectReferenceValue = intro;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(progression);
+                AssetDatabase.SaveAssets();
             }
 
             return progression;
@@ -558,8 +836,35 @@ namespace BattleForYourSoul.EditorTools
                 return;
             }
 
+            // AssetDatabase.CreateFolder needs an existing parent, so create ancestors first. This
+            // matters for nested authoring folders such as Weapons/Actions.
             string parent = System.IO.Path.GetDirectoryName(path)!.Replace('\\', '/');
+            if (!AssetDatabase.IsValidFolder(parent))
+            {
+                EnsureFolder(parent);
+            }
+
             AssetDatabase.CreateFolder(parent, System.IO.Path.GetFileName(path));
+        }
+
+        /// <summary>
+        /// Generates the throwaway placeholder art once when any required sprite is missing. On a
+        /// normal rebuild the committed PNGs already exist and this is a handful of cheap loads.
+        /// </summary>
+        private static void EnsurePlaceholderSprites()
+        {
+            if (LoadSprite(PlayerSpritePath) == null ||
+                LoadSprite(EnemySpritePath) == null ||
+                LoadSprite(ProjectileSpritePath) == null ||
+                LoadSprite(SwordSpritePath) == null ||
+                LoadSprite(SpearSpritePath) == null ||
+                LoadSprite(BowSpritePath) == null ||
+                LoadSprite(ArrowSpritePath) == null ||
+                LoadSprite(SlashVfxSpritePath) == null ||
+                LoadSprite(ThrustVfxSpritePath) == null)
+            {
+                PlaceholderArtGenerator.GenerateAll();
+            }
         }
 
         private static Sprite LoadSprite(string path)
@@ -664,12 +969,14 @@ namespace BattleForYourSoul.EditorTools
             collider.size = size;
         }
 
-        private static EnemySpawner BuildCombat(
+        private static (EnemySpawner, WeaponSelection) BuildCombat(
             GameObject player,
-            WeaponDefinition weaponDefinition,
             EnemyDefinition enemyDefinition,
             GameObject enemyPrefab,
-            GameObject projectilePrefab)
+            GameObject projectilePrefab,
+            GameObject attackVfxPrefab,
+            WeaponDefinition[] weapons,
+            GameSettings settings)
         {
             var registryGo = new GameObject("Enemy Registry");
             var registry = registryGo.AddComponent<EnemyRegistry>();
@@ -681,12 +988,106 @@ namespace BattleForYourSoul.EditorTools
             SetSerializedReference(spawner, "registry", registry);
             SetSerializedReference(spawner, "target", player.transform);
 
+            var input = player.AddComponent<WeaponInputReader>();
             var weapon = player.AddComponent<WeaponController>();
-            SetSerializedReference(weapon, "definition", weaponDefinition);
             SetSerializedReference(weapon, "projectilePrefab", projectilePrefab.GetComponent<Projectile>());
-            SetSerializedReference(weapon, "registry", registry);
+            SetSerializedReference(weapon, "attackVfxPrefab", attackVfxPrefab.GetComponent<AttackVfx>());
+            SetSerializedReference(weapon, "weaponInput", input);
+            SetSerializedReference(weapon, "movement", player.GetComponent<PlayerMovement>());
+            SetSerializedInt(weapon, "enemyMask", LayerMask.GetMask("Enemy"));
 
-            return spawner;
+            var selectionGo = new GameObject("Weapon Selection");
+            var selection = selectionGo.AddComponent<WeaponSelection>();
+            SetSerializedArray(selection, "weapons", weapons ?? new WeaponDefinition[0]);
+            SetSerializedReference(selection, "controller", weapon);
+
+            var pickupsRoot = new GameObject("Weapon Pickups");
+            SetSerializedReference(selection, "pickupsRoot", pickupsRoot);
+            BuildWeaponPickups(pickupsRoot.transform, settings, weapons, selection);
+
+            return (spawner, selection);
+        }
+
+        private static void BuildWeaponPickups(
+            Transform parent,
+            GameSettings settings,
+            WeaponDefinition[] weapons,
+            WeaponSelection selection)
+        {
+            if (weapons == null || weapons.Length == 0)
+            {
+                return;
+            }
+
+            if (LoadSprite(SwordSpritePath) == null || LoadSprite(SpearSpritePath) == null || LoadSprite(BowSpritePath) == null)
+            {
+                PlaceholderArtGenerator.GenerateAll();
+            }
+
+            IReadOnlyList<Vector2> authored = settings != null ? settings.WeaponPedestalPositions : null;
+            int count = authored != null ? authored.Count : 0;
+            if (count < weapons.Length)
+            {
+                Debug.LogWarning("[GameSceneBuilder] GameSettings has fewer weapon positions than weapons; using fallback positions.");
+                authored = new[]
+                {
+                    new Vector2(-4f, -1.2f),
+                    new Vector2(0f, -1.8f),
+                    new Vector2(4f, -1.2f),
+                };
+                count = authored.Count;
+            }
+
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            for (int i = 0; i < weapons.Length; i++)
+            {
+                WeaponDefinition weapon = weapons[i];
+                if (weapon == null)
+                {
+                    continue;
+                }
+
+                Vector2 position = authored[i % count];
+                var pickupGo = new GameObject($"Weapon_Pickup_{weapon.DisplayName}");
+                pickupGo.transform.SetParent(parent, false);
+                pickupGo.transform.position = new Vector3(position.x, position.y, 0f);
+                pickupGo.layer = LayerMask.NameToLayer("Pickup");
+
+                var spriteRenderer = pickupGo.AddComponent<SpriteRenderer>();
+                spriteRenderer.sprite = weapon.PickupSprite;
+                spriteRenderer.sortingLayerName = settings != null ? settings.EntitySortingLayer : "Entities";
+                pickupGo.AddComponent<IsometricSpriteSorter>();
+
+                var labelGo = new GameObject("Label");
+                labelGo.transform.SetParent(pickupGo.transform, false);
+                labelGo.transform.localPosition = new Vector3(0f, 0.8f, 0f);
+
+                var label = labelGo.AddComponent<TextMesh>();
+                label.font = font;
+                label.fontSize = 32;
+                label.characterSize = 0.05f;
+                label.anchor = TextAnchor.LowerCenter;
+                label.alignment = TextAlignment.Center;
+                label.text = weapon.DisplayName.ToUpperInvariant();
+                label.color = new Color32(236, 226, 176, 255);
+
+                var labelRenderer = labelGo.GetComponent<MeshRenderer>();
+                labelRenderer.sortingLayerName = settings != null ? settings.EntitySortingLayer : "Entities";
+                var labelSorter = labelGo.AddComponent<IsometricSpriteSorter>();
+                SetSerializedInt(labelSorter, "orderOffset", 1);
+
+                var trigger = pickupGo.AddComponent<BoxCollider2D>();
+                trigger.isTrigger = true;
+                trigger.size = new Vector2(0.8f, 0.8f);
+                trigger.offset = new Vector2(0f, 0.4f);
+
+                var pickup = pickupGo.AddComponent<WeaponPickup>();
+                SetSerializedReference(pickup, "weapon", weapon);
+                SetSerializedReference(pickup, "spriteRenderer", spriteRenderer);
+                SetSerializedReference(pickup, "label", label);
+                SetSerializedReference(pickup, "trigger", trigger);
+                SetSerializedReference(pickup, "selection", selection);
+            }
         }
 
         private static (Experience, LevelDirector) BuildProgression(
@@ -812,7 +1213,13 @@ namespace BattleForYourSoul.EditorTools
             return doors;
         }
 
-        private static LevelUpController BuildHud(GameObject player, EnemySpawner spawner, Experience experience, LevelDirector levelDirector, UpgradePool upgradePool)
+        private static LevelUpController BuildHud(
+            GameObject player,
+            EnemySpawner spawner,
+            Experience experience,
+            LevelDirector levelDirector,
+            UpgradePool upgradePool,
+            WeaponSelection selection)
         {
             var canvasGo = new GameObject("HUD", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = canvasGo.GetComponent<Canvas>();
@@ -858,8 +1265,19 @@ namespace BattleForYourSoul.EditorTools
             killLabel.fontSize = 36;
             killLabel.color = new Color32(236, 236, 244, 255);
 
+            // Equipped weapon, under the health bar, so Samsara's choice is always visible.
+            Text weaponLabel = CreateText("WeaponLabel", canvasGo.transform, font, "Weapon: none", TextAnchor.UpperLeft);
+            RectTransform weaponRect = weaponLabel.rectTransform;
+            weaponRect.anchorMin = new Vector2(0f, 1f);
+            weaponRect.anchorMax = new Vector2(0f, 1f);
+            weaponRect.pivot = new Vector2(0f, 1f);
+            weaponRect.anchoredPosition = new Vector2(24f, -62f);
+            weaponRect.sizeDelta = new Vector2(420f, 36f);
+            weaponLabel.fontSize = 28;
+            weaponLabel.color = new Color32(238, 224, 168, 255);
+
             // Stage indicator, centered at the top so it reads separately from kills and health.
-            Text stageLabel = CreateText("StageLabel", canvasGo.transform, font, "Stage 1", TextAnchor.UpperCenter);
+            Text stageLabel = CreateText("StageLabel", canvasGo.transform, font, "Samsara", TextAnchor.UpperCenter);
             RectTransform stageRect = stageLabel.rectTransform;
             stageRect.anchorMin = new Vector2(0.5f, 1f);
             stageRect.anchorMax = new Vector2(0.5f, 1f);
@@ -981,6 +1399,8 @@ namespace BattleForYourSoul.EditorTools
             SetSerializedReference(hud, "levelDirector", levelDirector);
             SetSerializedReference(hud, "stageLabel", stageLabel);
             SetSerializedReference(hud, "objectiveLabel", objectiveLabel);
+            SetSerializedReference(hud, "weaponLabel", weaponLabel);
+            SetSerializedReference(hud, "weaponSelection", selection);
 
             var gameOver = canvasGo.AddComponent<GameOverController>();
             SetSerializedReference(gameOver, "panel", panel.gameObject);
@@ -994,6 +1414,7 @@ namespace BattleForYourSoul.EditorTools
             SetSerializedReference(levelUp, "playerHealth", player.GetComponent<Health>());
             SetSerializedReference(levelUp, "panel", levelPanel.gameObject);
             SetSerializedReference(levelUp, "pool", upgradePool);
+            SetSerializedReference(levelUp, "weaponSelection", selection);
             SetSerializedReference(levelUp, "titleLabel", levelTitle);
             SetSerializedReference(levelUp, "hintLabel", levelHint);
             SetSerializedArray(levelUp, "cards", cards);
@@ -1145,12 +1566,14 @@ namespace BattleForYourSoul.EditorTools
             GameObject player,
             CameraFollow cameraFollow,
             LevelUpController levelUp,
-            StageDoor[] doors)
+            StageDoor[] doors,
+            WeaponSelection selection)
         {
             SetSerializedReference(director, "settings", settings);
             SetSerializedReference(director, "playerMovement", player.GetComponent<PlayerMovement>());
             SetSerializedReference(director, "cameraFollow", cameraFollow);
             SetSerializedReference(director, "levelUpController", levelUp);
+            SetSerializedReference(director, "weaponSelection", selection);
             SetSerializedArray(director, "doors", doors);
         }
 
@@ -1165,6 +1588,20 @@ namespace BattleForYourSoul.EditorTools
             }
 
             property.intValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void SetSerializedBool(Object target, string propertyName, bool value)
+        {
+            var serialized = new SerializedObject(target);
+            SerializedProperty property = serialized.FindProperty(propertyName);
+            if (property == null)
+            {
+                Debug.LogError($"[GameSceneBuilder] No serialized property '{propertyName}' on {target.GetType().Name}.");
+                return;
+            }
+
+            property.boolValue = value;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -1248,6 +1685,97 @@ namespace BattleForYourSoul.EditorTools
             }
 
             property.objectReferenceValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(target);
+            AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// Seeds the VFX fields on both new and pre-existing actions. Fields still at their initializer
+        /// defaults count as unauthored, so a rebuild backfills them without clobbering tuning.
+        /// </summary>
+        private static void SeedHitVfxFields(
+            WeaponActionDefinition action,
+            Sprite sprite,
+            Color color,
+            float size,
+            float duration,
+            float sweep)
+        {
+            var serialized = new SerializedObject(action);
+            SerializedProperty spriteProp = serialized.FindProperty("hitVfxSprite");
+            SerializedProperty colorProp = serialized.FindProperty("hitVfxColor");
+            SerializedProperty sizeProp = serialized.FindProperty("hitVfxSize");
+            SerializedProperty durationProp = serialized.FindProperty("hitVfxDuration");
+            SerializedProperty sweepProp = serialized.FindProperty("hitVfxSweep");
+            if (spriteProp == null || colorProp == null || sizeProp == null || durationProp == null || sweepProp == null)
+            {
+                Debug.LogError("[GameSceneBuilder] Missing hit-VFX property on a weapon action.");
+                return;
+            }
+
+            bool changed = false;
+            if (sprite != null && spriteProp.objectReferenceValue == null)
+            {
+                spriteProp.objectReferenceValue = sprite;
+                changed = true;
+            }
+
+            if (colorProp.colorValue == Color.white && color != Color.white)
+            {
+                colorProp.colorValue = color;
+                changed = true;
+            }
+
+            if (Mathf.Approximately(sizeProp.floatValue, 1.4f) && !Mathf.Approximately(size, 1.4f))
+            {
+                sizeProp.floatValue = size;
+                changed = true;
+            }
+
+            if (Mathf.Approximately(durationProp.floatValue, 0.22f) && !Mathf.Approximately(duration, 0.22f))
+            {
+                durationProp.floatValue = duration;
+                changed = true;
+            }
+
+            if (Mathf.Approximately(sweepProp.floatValue, 0f) && !Mathf.Approximately(sweep, 0f))
+            {
+                sweepProp.floatValue = sweep;
+                changed = true;
+            }
+
+            if (!changed)
+            {
+                return;
+            }
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(action);
+            AssetDatabase.SaveAssets();
+        }
+
+        private static void SeedArrayIfEmpty(Object target, string propertyName, Object[] values)
+        {
+            var serialized = new SerializedObject(target);
+            SerializedProperty property = serialized.FindProperty(propertyName);
+            if (property == null)
+            {
+                Debug.LogError($"[GameSceneBuilder] No serialized property '{propertyName}' on {target.GetType().Name}.");
+                return;
+            }
+
+            if (property.arraySize > 0)
+            {
+                return;
+            }
+
+            property.arraySize = values.Length;
+            for (int i = 0; i < values.Length; i++)
+            {
+                property.GetArrayElementAtIndex(i).objectReferenceValue = values[i];
+            }
+
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(target);
             AssetDatabase.SaveAssets();

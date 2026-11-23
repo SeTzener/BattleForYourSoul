@@ -34,8 +34,17 @@ namespace BattleForYourSoul.Progression
         [Tooltip("Enemies already standing on the map when this stage starts. Clear all of them to unlock the exits.")]
         [SerializeField] private EnemyPlacement[] enemyPlacements;
 
+        [Header("Room rules")]
+        [Tooltip("Marks a weapon-selection room: no enemies, pickups are active, and the exit locks the chosen weapon.")]
+        [SerializeField] private bool weaponSelectionStage;
+
+        [Tooltip("Indices of the shared door fixtures enabled in this room. Empty means all doors.")]
+        [SerializeField] private int[] activeDoorIndices;
+
         public string DisplayName => displayName;
         public int MonsterLevel => monsterLevel;
         public IReadOnlyList<EnemyPlacement> EnemyPlacements => enemyPlacements;
+        public bool IsWeaponSelectionStage => weaponSelectionStage;
+        public IReadOnlyList<int> ActiveDoorIndices => activeDoorIndices;
     }
 }

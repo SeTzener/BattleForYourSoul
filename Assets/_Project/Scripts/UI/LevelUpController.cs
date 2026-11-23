@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using BattleForYourSoul.Combat;
 using BattleForYourSoul.Player;
 using BattleForYourSoul.Progression;
+using BattleForYourSoul.Weapons;
 
 namespace BattleForYourSoul.UI
 {
@@ -25,6 +26,7 @@ namespace BattleForYourSoul.UI
         [SerializeField] private GameObject panel;
         [SerializeField] private UpgradeCardView[] cards;
         [SerializeField] private UpgradePool pool;
+        [SerializeField] private WeaponSelection weaponSelection;
         [SerializeField] private Text titleLabel;
         [SerializeField] private Text hintLabel;
 
@@ -127,7 +129,8 @@ namespace BattleForYourSoul.UI
             }
 
             UpgradeCategoryDefinition category = _queue.Dequeue();
-            BuildChoices(category);
+            WeaponDefinition weapon = weaponSelection != null ? weaponSelection.SelectedWeapon : null;
+            BuildChoices(category, weapon);
 
             if (_choices.Count == 0)
             {
@@ -215,20 +218,26 @@ namespace BattleForYourSoul.UI
             }
         }
 
-        private void BuildChoices(UpgradeCategoryDefinition category)
+        private void BuildChoices(UpgradeCategoryDefinition category, WeaponDefinition weapon)
         {
             _choices.Clear();
-            Collect(category);
+            Collect(category, weapon, true);
 
-            // A category with too few authored upgrades falls back to the full pool rather than
-            // blocking the run with an empty choice.
+            // A category with too few authored upgrades falls back to the rest of the pool, keeping the
+            // weapon filter so a bow never receives a sword upgrade.
             if (_choices.Count == 0 && category != null)
             {
-                Collect(null);
+                Collect(null, weapon, true);
+            }
+
+            // Last resort for an empty or misconfigured pool: offer anything rather than soft-lock.
+            if (_choices.Count == 0)
+            {
+                Collect(null, null, false);
             }
         }
 
-        private void Collect(UpgradeCategoryDefinition category)
+        private void Collect(UpgradeCategoryDefinition category, WeaponDefinition weapon, bool filterByWeapon)
         {
             _scratch.Clear();
 
@@ -246,6 +255,11 @@ namespace BattleForYourSoul.UI
                 }
 
                 if (category != null && upgrade.Category != category)
+                {
+                    continue;
+                }
+
+                if (filterByWeapon && !upgrade.AppliesTo(weapon))
                 {
                     continue;
                 }

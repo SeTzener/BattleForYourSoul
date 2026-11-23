@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using BattleForYourSoul.Combat;
 
 namespace BattleForYourSoul.Progression
 {
@@ -17,6 +18,11 @@ namespace BattleForYourSoul.Progression
         ProjectileSpeedPercent,
         MaxHealthFlat,
         ExtraProjectiles,
+
+        // Appended so existing authored upgrades keep their enum values.
+        RangeFlat,
+        RicochetBounces,
+        ImpactRadius,
     }
 
     /// <summary>One additive modifier inside an upgrade, applied on top of everything before it.</summary>
@@ -58,6 +64,10 @@ namespace BattleForYourSoul.Progression
         [Tooltip("Used by door-picked clear rewards. Uncategorised upgrades stay in normal level-ups.")]
         [SerializeField] private UpgradeCategoryDefinition category;
 
+        [Header("Weapon")]
+        [Tooltip("Empty = available to every weapon. Otherwise only offered while one of these weapons is equipped.")]
+        [SerializeField] private WeaponDefinition[] weaponFilter;
+
         [Header("Effect")]
         [SerializeField] private List<StatModifier> modifiers = new List<StatModifier>();
 
@@ -68,5 +78,23 @@ namespace BattleForYourSoul.Progression
         public Color Color => color;
         public UpgradeCategoryDefinition Category => category;
         public IReadOnlyList<StatModifier> Modifiers => modifiers;
+
+        public bool AppliesTo(WeaponDefinition weapon)
+        {
+            if (weaponFilter == null || weaponFilter.Length == 0)
+            {
+                return true;
+            }
+
+            for (int i = 0; i < weaponFilter.Length; i++)
+            {
+                if (weaponFilter[i] == weapon)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
     }
 }

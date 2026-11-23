@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: StageProgression_Default
   m_EditorClassIdentifier: BattleForYourSoul::BattleForYourSoul.Progression.StageProgression
   stages:
+  - {fileID: 11400000, guid: 0fb79b81b140841ed92319967eec853b, type: 2}
   - {fileID: 11400000, guid: ef8acd1990c8844459def9e3352108ff, type: 2}
   - {fileID: 11400000, guid: 1a8d83192fc9c4f5faa7b3e413917840, type: 2}
   - {fileID: 11400000, guid: 0531489badb2846c7b4bb8b140b83883, type: 2}
