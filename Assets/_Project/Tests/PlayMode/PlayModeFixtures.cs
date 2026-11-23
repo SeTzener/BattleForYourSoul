@@ -5,6 +5,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using BattleForYourSoul.Combat;
 using BattleForYourSoul.Player;
+using BattleForYourSoul.VFX;
+using BattleForYourSoul.Weapons;
 
 namespace BattleForYourSoul.Tests.PlayMode
 {
@@ -19,6 +21,7 @@ namespace BattleForYourSoul.Tests.PlayMode
 
         private readonly List<GameObject> _objects = new List<GameObject>();
         private readonly List<ScriptableObject> _assets = new List<ScriptableObject>();
+        private readonly List<UnityEngine.Object> _extraObjects = new List<UnityEngine.Object>();
 
         public GameObject NewObject(string name)
         {
@@ -60,6 +63,92 @@ namespace BattleForYourSoul.Tests.PlayMode
             return asset;
         }
 
+        public Sprite CreateSprite(string name)
+        {
+            Texture2D texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            texture.SetPixel(0, 0, Color.white);
+            texture.Apply();
+            _extraObjects.Add(texture);
+
+            Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f));
+            sprite.name = name;
+            _extraObjects.Add(sprite);
+            return sprite;
+        }
+
+        public WeaponActionDefinition CreateWeaponAction(
+            WeaponAttackShape shape,
+            float cooldown = 0.4f,
+            float damage = 5f,
+            float range = 3f,
+            float arcDegrees = 90f,
+            float lineWidth = 0.4f,
+            int projectilesPerShot = 1,
+            float spreadDegrees = 0f,
+            float projectileSpeed = 10f,
+            float projectileLifetime = 0.5f,
+            Sprite projectileSprite = null,
+            Sprite hitVfxSprite = null,
+            float hitVfxSize = 1f,
+            float hitVfxDuration = 0.2f,
+            float hitVfxSweep = 0f)
+        {
+            return CreateAsset<WeaponActionDefinition>(
+                ("shape", shape),
+                ("cooldown", cooldown),
+                ("damage", damage),
+                ("range", range),
+                ("arcDegrees", arcDegrees),
+                ("lineWidth", lineWidth),
+                ("projectilesPerShot", projectilesPerShot),
+                ("spreadDegrees", spreadDegrees),
+                ("projectileSpeed", projectileSpeed),
+                ("projectileLifetime", projectileLifetime),
+                ("projectileSprite", projectileSprite),
+                ("hitVfxSprite", hitVfxSprite),
+                ("hitVfxSize", hitVfxSize),
+                ("hitVfxDuration", hitVfxDuration),
+                ("hitVfxSweep", hitVfxSweep));
+        }
+
+        public WeaponDefinition CreateWeapon(WeaponActionDefinition primary, WeaponActionDefinition special = null)
+        {
+            return CreateAsset<WeaponDefinition>(
+                ("primaryAction", primary),
+                ("specialAction", special));
+        }
+
+        public Health CreateTarget(string name, Vector2 position, int layer, float maxHealth = 100f, float radius = 0.5f)
+        {
+            GameObject go = NewObject(name);
+            go.layer = layer;
+            go.transform.position = new Vector3(position.x, position.y, 0f);
+            CircleCollider2D collider = go.AddComponent<CircleCollider2D>();
+            collider.radius = radius;
+
+            Health health = go.AddComponent<Health>();
+            SetField(health, "maxHealth", maxHealth);
+            Activate(go);
+            return health;
+        }
+
+        public Projectile CreateProjectilePrefab()
+        {
+            GameObject prefab = NewObject("ProjectilePrefab");
+            prefab.AddComponent<Rigidbody2D>();
+            prefab.AddComponent<SpriteRenderer>();
+            return prefab.AddComponent<Projectile>();
+        }
+
+        public AttackVfx CreateVfxPrefab(float growth = 1.5f)
+        {
+            GameObject prefab = NewObject("VfxPrefab");
+            prefab.AddComponent<SpriteRenderer>();
+            AttackVfx vfx = prefab.AddComponent<AttackVfx>();
+            SetField(vfx, "growth", growth);
+            return vfx;
+        }
+
         /// <summary>
         /// Builds a player with only the components a mechanics test needs. Everything is configured
         /// before activation so Awake sees the intended values.
@@ -69,7 +158,10 @@ namespace BattleForYourSoul.Tests.PlayMode
             float maxHealth = 100f,
             float dashCooldown = 5f,
             float dashDuration = 0.05f,
-            float dashGrace = 0.1f)
+            float dashGrace = 0.1f,
+            LayerMask enemyMask = default,
+            AttackVfx vfxPrefab = null,
+            int prewarmCount = 0)
         {
             GameObject go = NewObject("Player");
             Rigidbody2D body = go.AddComponent<Rigidbody2D>();
@@ -92,15 +184,14 @@ namespace BattleForYourSoul.Tests.PlayMode
             WeaponController weapon = null;
             if (withWeapon)
             {
-                // The pool needs a non-null prefab, but tests never fire a shot, so prewarm stays zero.
-                GameObject prefab = NewObject("ProjectilePrefab");
-                prefab.AddComponent<Rigidbody2D>();
-                Projectile projectile = prefab.AddComponent<Projectile>();
+                Projectile projectile = CreateProjectilePrefab();
 
                 weapon = go.AddComponent<WeaponController>();
                 SetField(weapon, "projectilePrefab", projectile);
-                SetField(weapon, "prewarmCount", 0);
-                SetField(weapon, "maxPoolSize", 4);
+                SetField(weapon, "enemyMask", enemyMask);
+                SetField(weapon, "attackVfxPrefab", vfxPrefab);
+                SetField(weapon, "prewarmCount", prewarmCount);
+                SetField(weapon, "maxPoolSize", 8);
                 SetField(weapon, "movement", movement);
             }
 
@@ -157,8 +248,17 @@ namespace BattleForYourSoul.Tests.PlayMode
                 }
             }
 
+            for (int i = 0; i < _extraObjects.Count; i++)
+            {
+                if (_extraObjects[i] != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(_extraObjects[i]);
+                }
+            }
+
             _objects.Clear();
             _assets.Clear();
+            _extraObjects.Clear();
         }
     }
 
