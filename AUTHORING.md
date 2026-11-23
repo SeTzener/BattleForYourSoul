@@ -41,6 +41,20 @@ These were established with the first milestones and apply to every new system:
 - **Isometric sorting is centralised.** `IsometricSpriteSorter` derives depth from world position;
   never assign arbitrary fixed per-sprite sort orders.
 
+## Automated tests
+
+Tests live in `Assets/_Project/Tests` and target mechanics, not placeholder art or content:
+
+- **EditMode** — fast tests for pure maths and authoring-time data: isometric grid round-trips,
+  monster scaling, the XP curve, default weapon modifiers and upgrade weapon filters.
+- **PlayMode** — stateful components wired from minimal objects built in test code, never the
+  generated scene: health damage/immunity/death, XP and level-ups, upgrade aggregation, dash
+  charges/cooldown/grace/teleport, and the HUD's delayed ghost bar.
+
+Run them from Unity's Test Runner or with `unity test . --mode EditMode` /
+`unity test . --mode PlayMode`. When using a connected Editor, stop Play mode first: an EditMode
+run cannot start while the Editor is already playing.
+
 ## Where things live
 
 | What you want to change | Asset | Notes |
