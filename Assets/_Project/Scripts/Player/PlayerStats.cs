@@ -1,6 +1,7 @@
 using UnityEngine;
 using BattleForYourSoul.Combat;
 using BattleForYourSoul.Progression;
+using BattleForYourSoul.Weapons;
 
 namespace BattleForYourSoul.Player
 {
@@ -31,6 +32,9 @@ namespace BattleForYourSoul.Player
         private float _fireRateMultiplier = 1f;
         private float _moveSpeedMultiplier = 1f;
         private float _projectileSpeedMultiplier = 1f;
+        private float _rangeBonus;
+        private float _ricochetBounces;
+        private float _impactRadius;
         private int _extraProjectiles;
 
         private void Awake()
@@ -89,6 +93,15 @@ namespace BattleForYourSoul.Player
                 case UpgradeStat.ExtraProjectiles:
                     _extraProjectiles += Mathf.RoundToInt(modifier.Value);
                     break;
+                case UpgradeStat.RangeFlat:
+                    _rangeBonus += modifier.Value;
+                    break;
+                case UpgradeStat.RicochetBounces:
+                    _ricochetBounces += Mathf.RoundToInt(modifier.Value);
+                    break;
+                case UpgradeStat.ImpactRadius:
+                    _impactRadius += modifier.Value;
+                    break;
             }
         }
 
@@ -102,7 +115,18 @@ namespace BattleForYourSoul.Player
 
             if (weapon != null)
             {
-                weapon.SetModifiers(_damageFlat, _damageMultiplier, _fireRateMultiplier, _extraProjectiles, _projectileSpeedMultiplier);
+                var modifiers = new WeaponModifiers
+                {
+                    DamageFlat = _damageFlat,
+                    DamageMultiplier = _damageMultiplier,
+                    FireRateMultiplier = _fireRateMultiplier,
+                    ExtraProjectiles = _extraProjectiles,
+                    ProjectileSpeedMultiplier = _projectileSpeedMultiplier,
+                    RangeFlat = _rangeBonus,
+                    RicochetBounces = _ricochetBounces,
+                    ImpactRadius = _impactRadius,
+                };
+                weapon.SetModifiers(modifiers);
             }
 
             if (movement != null)

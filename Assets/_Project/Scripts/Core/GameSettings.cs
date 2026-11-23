@@ -44,6 +44,9 @@ namespace BattleForYourSoul.Core
         [Tooltip("World positions of the exits along the far edge of the room.")]
         [SerializeField] private Vector2[] doorPositions;
 
+        [Tooltip("World positions of the physical weapon pickups in Samsara.")]
+        [SerializeField] private Vector2[] weaponPedestalPositions;
+
         public int PixelsPerUnit => pixelsPerUnit;
         public Vector2Int ReferenceResolution => referenceResolution;
         public float IsometricRatio => isometricRatio;
@@ -53,5 +56,6 @@ namespace BattleForYourSoul.Core
         public string VfxSortingLayer => vfxSortingLayer;
         public Vector2 RoomEntrance => roomEntrance;
         public IReadOnlyList<Vector2> DoorPositions => doorPositions;
+        public IReadOnlyList<Vector2> WeaponPedestalPositions => weaponPedestalPositions;
     }
 }

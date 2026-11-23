@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using BattleForYourSoul.Combat;
 using BattleForYourSoul.Enemies;
 using BattleForYourSoul.Progression;
+using BattleForYourSoul.Weapons;
 
 namespace BattleForYourSoul.UI
 {
@@ -24,6 +25,8 @@ namespace BattleForYourSoul.UI
         [SerializeField] private LevelDirector levelDirector;
         [SerializeField] private Text stageLabel;
         [SerializeField] private Text objectiveLabel;
+        [SerializeField] private Text weaponLabel;
+        [SerializeField] private WeaponSelection weaponSelection;
 
         private void OnEnable()
         {
@@ -55,6 +58,13 @@ namespace BattleForYourSoul.UI
                 HandleStageChanged(levelDirector.StageNumber);
                 HandleObjectiveChanged();
             }
+
+            if (weaponSelection != null)
+            {
+                weaponSelection.SelectionChanged += HandleWeaponChanged;
+                weaponSelection.WeaponLocked += HandleWeaponChanged;
+                HandleWeaponChanged(weaponSelection.SelectedWeapon);
+            }
         }
 
         private void OnDisable()
@@ -80,6 +90,12 @@ namespace BattleForYourSoul.UI
                 levelDirector.RemainingChanged -= HandleObjectiveChanged;
                 levelDirector.ClearedChanged -= HandleObjectiveChanged;
                 levelDirector.PendingCategoryChanged -= HandleObjectiveChanged;
+            }
+
+            if (weaponSelection != null)
+            {
+                weaponSelection.SelectionChanged -= HandleWeaponChanged;
+                weaponSelection.WeaponLocked -= HandleWeaponChanged;
             }
         }
 
@@ -114,10 +130,26 @@ namespace BattleForYourSoul.UI
 
         private void HandleStageChanged(int stage)
         {
-            if (stageLabel != null)
+            if (stageLabel == null)
             {
-                stageLabel.text = $"Stage {stage}";
+                return;
             }
+
+            StageDefinition current = levelDirector != null ? levelDirector.CurrentStage : null;
+            stageLabel.text = current != null ? current.DisplayName : $"Stage {stage}";
+        }
+
+        private void HandleWeaponChanged(WeaponDefinition weapon)
+        {
+            if (weaponLabel == null)
+            {
+                return;
+            }
+
+            string name = weapon != null ? weapon.DisplayName : "none";
+            string suffix = weaponSelection != null && weaponSelection.IsLocked ? " (locked)" : "";
+            weaponLabel.text = $"Weapon: {name}{suffix}";
+            HandleObjectiveChanged();
         }
 
         private void HandleObjectiveChanged()
@@ -129,6 +161,15 @@ namespace BattleForYourSoul.UI
 
             UpgradeCategoryDefinition pending = levelDirector.PendingRewardCategory;
             string reward = pending != null ? pending.DisplayName : "none";
+
+            if (levelDirector.IsWeaponSelectionStage)
+            {
+                bool hasWeapon = weaponSelection != null && weaponSelection.SelectedWeapon != null;
+                objectiveLabel.text = !hasWeapon
+                    ? "Pick up a weapon to begin - clear reward: " + reward
+                    : $"Take the exit to lock {weaponSelection.SelectedWeapon.DisplayName} - clear reward: {reward}";
+                return;
+            }
 
             objectiveLabel.text = levelDirector.IsCleared
                 ? $"Exits open - choose a door (clear reward: {reward})"

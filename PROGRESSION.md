@@ -10,7 +10,11 @@ this document, not the other way around.
 
 The game is a **Hades-style** action roguelite, not a Vampire-Survivors-style loot collector:
 
-- The run is a sequence of discrete rooms. Enemies are already in the room when it starts.
+- The run starts in **Samsara**, a no-enemy weapon-selection room with one door and three physical
+  weapon pickups. The player can try and swap freely, but must pick a weapon before leaving; the exit
+  locks that weapon for the run.
+- After Samsara, the run is a sequence of discrete rooms. Enemies are already in the room when it
+  starts.
 - Clear every enemy to unlock the exits; then **walk into a door** to advance.
 - Each door advertises the reward category that will be offered when the *next* room is cleared, so
   the exit is a choice about future build direction, not just a hallway.
@@ -37,6 +41,9 @@ harder and pay more XP, while the door choice nudges which upgrades can appear a
 
 - Stages are authored as `StageDefinition` assets; `StageProgression_Default` lists them in play
   order. Each stage sets its **monster level** and a fixed `EnemyPlacement[]` (type + position).
+- A stage can also be marked `weaponSelectionStage`, which suppresses enemy spawning, shows the
+  weapon pickups, and gates the exit on a selection. `activeDoorIndices` limits which shared door
+  fixtures are enabled (Samsara uses just one).
 - `EnemySpawner` places those enemies once when the stage starts. They are pooled, but there is no
   timer, kill quota or replacement wave.
 - Enemies are stationed: they wait until the player enters their `EnemyDefinition.aggroRadius`, then
@@ -64,6 +71,41 @@ harder and pay more XP, while the door choice nudges which upgrades can appear a
   that is already open. A category with fewer than three upgrades falls back to the full pool rather
   than soft-locking the run.
 
+### Samsara: weapon selection
+
+Samsara is the first stage in `StageProgression_Default`. It is a staging room, not a combat room:
+
+1. No enemies are placed, so the room starts cleared. Three physical pickups — sword, spear and bow —
+   stand on pedestals authored in `GameSettings.weaponPedestalPositions`.
+2. Walking into a pickup equips it. The player may pick up another at any time; the previously
+   selected prop reappears at its original pedestal, so every weapon stays available to try.
+3. Only one door is active. It stays locked (no label, closed art) until a weapon has been picked.
+4. Walking into the unlocked door calls `WeaponSelection.Lock()` and advances to the next stage. The
+   choice is now final for the run: swapping is no longer possible and the pickups are hidden for all
+   later stages.
+
+`WeaponSelection` owns the selection state, `WeaponController` receives the chosen definition, and
+`LevelDirector` drives the door gate from the stage rule. None of this uses static state or scene-wide
+searches; the builder wires the references directly.
+
+### Weapons and two actions
+
+Each weapon has exactly two Input System actions — **primary** and **special** — mapped to
+`PrimaryAttack` / `SecondaryAttack`. Gameplay code never reads a keyboard directly. Attacks are
+manual: nothing auto-fires.
+
+| Weapon | Primary | Special | Delivery |
+|---|---|---|---|
+| Sword | Slash | Cleave | close melee arc; wider special |
+| Spear | Thrust | Sweep | long line reach; wider special |
+| Bow | Shot | Spread | projectile; multi-shot special |
+
+Weapon-specific behaviours such as bow multishot/ricochet and sword longer reach/area impact are
+**upgrades**, not extra actions. The two-action input surface never changes.
+
+> For now they're upgrades but don' forget these are just placeholders. The real weapons are gonna be
+> different. I just need the mechanics to be in place.
+
 ### XP flow
 
 1. Enemy dies → `EnemySpawner.EnemyDied` and its live count drops.
@@ -74,7 +116,8 @@ harder and pay more XP, while the door choice nudges which upgrades can appear a
 5. When `Experience` crosses a threshold, `LevelUpController` pauses and offers an unfiltered upgrade
    choice, queued behind any category reward.
 
-No pickups, no pools for XP, no magnet radius.
+No pickups, no pools for XP, no magnet radius. Samsara grants no XP; the flow above starts on the
+stage after the weapon is chosen.
 
 ## Upgrades
 
@@ -85,8 +128,16 @@ built. `PlayerStats` aggregates the chosen ones and pushes the result into `Heal
 
 Seeded placeholder categories: **Shots**, **Mobility**, **Vitality**.
 
+An upgrade can also carry a **weapon filter**. Global upgrades (mobility, vitality and the shared
+stats) have an empty filter and roll for every weapon. Weapon-specific effects only appear while the
+matching weapon is equipped, so a bow run never sees sword-only cards and vice versa. `PlayerStats`
+keeps one set of accumulated totals across weapon swaps inside Samsara, so trying a different weapon
+never loses an upgrade.
+
 Current upgrades: projectile damage, fire rate, move speed, max health, extra projectile, projectile
-speed. Ricochet and other new projectile behaviours are out of scope until their own milestone.
+speed, plus weapon-filtered placeholders — sword reach/edge/impact, spear reach/broadhead/quick
+thrust, bow split/ricochet/impact. Ricochet and impact burst are implemented as inert-by-default
+effects: they do nothing until their upgrade is taken.
 
 ## Open questions / to tune
 
@@ -96,4 +147,7 @@ speed. Ricochet and other new projectile behaviours are out of scope until their
 - **Enemy variety per stage**: stages already list placements of any enemy type; more types still to
   author.
 - **Category list**: placeholders only; final categories and their upgrades are still to be designed.
+- **Weapons**: sword/spear/bow and their six actions are placeholders. The real weapons will be
+  different; the milestone establishes the mechanics (pickup, swap, lock, two actions, filtered
+  effects) rather than the final combat design.
 - **Run end / boss stages**: not modelled yet.

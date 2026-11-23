@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
+using BattleForYourSoul.Combat;
 using BattleForYourSoul.Core;
 using BattleForYourSoul.Enemies;
 using BattleForYourSoul.Player;
 using BattleForYourSoul.UI;
+using BattleForYourSoul.Weapons;
 using BattleForYourSoul.World;
 
 namespace BattleForYourSoul.Progression
@@ -28,6 +31,7 @@ namespace BattleForYourSoul.Progression
         [SerializeField] private PlayerMovement playerMovement;
         [SerializeField] private CameraFollow cameraFollow;
         [SerializeField] private LevelUpController levelUpController;
+        [SerializeField] private WeaponSelection weaponSelection;
         [SerializeField] private StageDoor[] doors;
 
         private int _stageIndex;
@@ -55,6 +59,9 @@ namespace BattleForYourSoul.Progression
         /// <summary>Category whose filtered choice is queued when this stage is cleared.</summary>
         public UpgradeCategoryDefinition PendingRewardCategory => _pendingCategory;
 
+        /// <summary>Whether the current room is Samsara, the weapon-selection room.</summary>
+        public bool IsWeaponSelectionStage => CurrentStage != null && CurrentStage.IsWeaponSelectionStage;
+
         /// <summary>Raised with the new stage number whenever the run advances.</summary>
         public event Action<int> LevelChanged;
 
@@ -74,6 +81,11 @@ namespace BattleForYourSoul.Progression
                 spawner.RemainingChanged += HandleRemainingChanged;
                 spawner.Cleared += HandleCleared;
             }
+
+            if (weaponSelection != null)
+            {
+                weaponSelection.SelectionChanged += HandleWeaponSelected;
+            }
         }
 
         private void OnDisable()
@@ -82,6 +94,11 @@ namespace BattleForYourSoul.Progression
             {
                 spawner.RemainingChanged -= HandleRemainingChanged;
                 spawner.Cleared -= HandleCleared;
+            }
+
+            if (weaponSelection != null)
+            {
+                weaponSelection.SelectionChanged -= HandleWeaponSelected;
             }
         }
 
@@ -99,12 +116,26 @@ namespace BattleForYourSoul.Progression
             PendingCategoryChanged?.Invoke(_pendingCategory);
         }
 
-        /// <summary>Called by a door trigger once the room is clear. Commits to that door's category.</summary>
+        /// <summary>
+        /// Called by a door trigger once the room is clear. In Samsara the exit also commits the
+        /// weapon choice for the rest of the run, and stays locked until one has been equipped.
+        /// </summary>
         public void SelectExit(StageDoor door)
         {
             if (!_cleared || door == null)
             {
                 return;
+            }
+
+            bool lockingWeapon = IsWeaponSelectionStage && weaponSelection != null;
+            if (lockingWeapon && weaponSelection.SelectedWeapon == null)
+            {
+                return;
+            }
+
+            if (lockingWeapon)
+            {
+                weaponSelection.Lock();
             }
 
             _pendingCategory = door.Category;
@@ -124,7 +155,13 @@ namespace BattleForYourSoul.Progression
         private void ApplyStage()
         {
             _cleared = false;
+            ApplyDoorAvailability();
             SetDoorsUnlocked(false);
+            if (weaponSelection != null)
+            {
+                weaponSelection.SetPickupsVisible(IsWeaponSelectionStage);
+            }
+
             ClearedChanged?.Invoke(false);
 
             if (spawner != null)
@@ -152,12 +189,64 @@ namespace BattleForYourSoul.Progression
             }
 
             _cleared = true;
-            SetDoorsUnlocked(true);
+            UpdateDoorUnlocks();
             ClearedChanged?.Invoke(true);
 
             if (_pendingCategory != null && levelUpController != null)
             {
                 levelUpController.QueueCategoryReward(_pendingCategory);
+            }
+        }
+
+        private void HandleWeaponSelected(WeaponDefinition _)
+        {
+            if (_cleared)
+            {
+                UpdateDoorUnlocks();
+            }
+        }
+
+        /// <summary>
+        /// An empty Samsara room is clear immediately, but its exit only opens once the player has
+        /// equipped a weapon. Every other room opens its enabled exits as soon as it is cleared.
+        /// </summary>
+        private void UpdateDoorUnlocks()
+        {
+            bool hasWeapon = weaponSelection == null || weaponSelection.SelectedWeapon != null;
+            SetDoorsUnlocked(_cleared && (!IsWeaponSelectionStage || hasWeapon));
+        }
+
+        private void ApplyDoorAvailability()
+        {
+            if (doors == null)
+            {
+                return;
+            }
+
+            IReadOnlyList<int> active = CurrentStage != null ? CurrentStage.ActiveDoorIndices : null;
+            bool allDoors = active == null || active.Count == 0;
+
+            for (int i = 0; i < doors.Length; i++)
+            {
+                if (doors[i] == null)
+                {
+                    continue;
+                }
+
+                bool enabled = allDoors;
+                if (!allDoors)
+                {
+                    for (int j = 0; j < active.Count; j++)
+                    {
+                        if (active[j] == i)
+                        {
+                            enabled = true;
+                            break;
+                        }
+                    }
+                }
+
+                doors[i].gameObject.SetActive(enabled);
             }
         }
 

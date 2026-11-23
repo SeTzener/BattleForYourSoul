@@ -32,6 +32,7 @@ namespace BattleForYourSoul.EditorTools
             EnsureFolder("Assets/_Project/Art/Characters");
             EnsureFolder("Assets/_Project/Art/VFX");
             EnsureFolder("Assets/_Project/Art/UI");
+            EnsureFolder("Assets/_Project/Art/Items");
 
             GenerateFloorTiles();
             GeneratePlayer();
@@ -40,6 +41,8 @@ namespace BattleForYourSoul.EditorTools
             GenerateProjectileBolt();
             GenerateUpgradeIcon();
             GenerateDoors();
+            GenerateWeapons();
+            GenerateAttackVfx();
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -359,6 +362,127 @@ namespace BattleForYourSoul.EditorTools
                     float nx = (x + 0.5f - cx) / rx;
                     float ny = (y + 0.5f - cy) / ry;
                     if (nx * nx + ny * ny <= 1f)
+                    {
+                        px[y * w + x] = color;
+                    }
+                }
+            }
+        }
+
+        private static void GenerateWeapons()
+        {
+            var steel = new Color32(206, 216, 230, 255);
+            var steelDark = new Color32(140, 154, 178, 255);
+            var wood = new Color32(150, 104, 64, 255);
+            var gold = new Color32(232, 186, 92, 255);
+            var stringColor = new Color32(238, 226, 188, 255);
+
+            var sword = new Color32[16 * 16];
+            FillRect(sword, 16, 16, 7, 6, 2, 9, steel);
+            sword[15 * 16 + 7] = steel;
+            sword[15 * 16 + 8] = steel;
+            FillRect(sword, 16, 16, 7, 7, 1, 6, steelDark);
+            FillRect(sword, 16, 16, 4, 5, 8, 1, gold);
+            FillRect(sword, 16, 16, 7, 2, 2, 3, wood);
+            FillRect(sword, 16, 16, 6, 1, 4, 1, gold);
+            WriteSprite("Assets/_Project/Art/Items/Weapon_Sword.png", sword, 16, 16, SpriteAlignment.BottomCenter);
+
+            var spear = new Color32[16 * 16];
+            FillRect(spear, 16, 16, 7, 1, 2, 10, wood);
+            FillRect(spear, 16, 16, 7, 11, 2, 3, steel);
+            spear[15 * 16 + 7] = steel;
+            spear[15 * 16 + 8] = steel;
+            FillRect(spear, 16, 16, 5, 11, 2, 1, steelDark);
+            FillRect(spear, 16, 16, 9, 11, 2, 1, steelDark);
+            WriteSprite("Assets/_Project/Art/Items/Weapon_Spear.png", spear, 16, 16, SpriteAlignment.BottomCenter);
+
+            var bow = new Color32[16 * 16];
+            FillRect(bow, 16, 16, 4, 2, 1, 12, stringColor);
+            FillRect(bow, 16, 16, 6, 2, 2, 2, wood);
+            FillRect(bow, 16, 16, 8, 4, 2, 4, wood);
+            FillRect(bow, 16, 16, 9, 8, 1, 3, wood);
+            FillRect(bow, 16, 16, 8, 11, 2, 2, wood);
+            FillRect(bow, 16, 16, 6, 13, 2, 1, wood);
+            WriteSprite("Assets/_Project/Art/Items/Weapon_Bow.png", bow, 16, 16, SpriteAlignment.BottomCenter);
+
+            var arrow = new Color32[8 * 8];
+            FillRect(arrow, 8, 8, 1, 3, 5, 2, wood);
+            FillRect(arrow, 8, 8, 6, 2, 2, 4, steel);
+            FillRect(arrow, 8, 8, 0, 2, 1, 2, gold);
+            FillRect(arrow, 8, 8, 0, 5, 1, 2, gold);
+            WriteSprite("Assets/_Project/Art/VFX/Projectile_Arrow.png", arrow, 8, 8, SpriteAlignment.Center);
+        }
+
+        /// <summary>
+        /// Throwaway attack VFX. Both sprites point along +X so the runtime only has to rotate them to
+        /// the attack direction. They are white so each action can tint them.
+        /// </summary>
+        private static void GenerateAttackVfx()
+        {
+            const int w = 32;
+            const int h = 32;
+
+            // Sword: a crescent sweeping from -75 to +75 degrees, thick in the middle and tapered at
+            // the tips. A dim wide pass underneath a bright narrow core reads as a slash at any size.
+            var slash = new Color32[w * h];
+            FillArc(slash, w, h, 16, 16, 8, 15, 78f, new Color32(150, 200, 255, 110));
+            FillArc(slash, w, h, 16, 16, 10, 14, 70f, new Color32(255, 255, 255, 255));
+            WriteSprite("Assets/_Project/Art/VFX/VFX_Slash.png", slash, w, h, SpriteAlignment.Center);
+
+            // Spear: a narrow tapered streak with a bright core, pointing right.
+            var thrust = new Color32[w * h];
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    float nx = (x + 0.5f - 16) / 15f;
+                    float ny = (y + 0.5f - 16) / 15f;
+                    if (nx < -0.95f || nx > 1f)
+                    {
+                        continue;
+                    }
+
+                    float taper = Mathf.Clamp01(1f - Mathf.Max(0f, nx) * 0.85f);
+                    float thickness = 0.3f * taper;
+                    if (Mathf.Abs(ny) > thickness)
+                    {
+                        continue;
+                    }
+
+                    float edge = 1f - Mathf.Abs(ny) / thickness;
+                    thrust[y * w + x] = edge > 0.5f
+                        ? new Color32(255, 255, 255, 255)
+                        : new Color32(150, 210, 255, 130);
+                }
+            }
+
+            WriteSprite("Assets/_Project/Art/VFX/VFX_Thrust.png", thrust, w, h, SpriteAlignment.Center);
+        }
+
+        /// <summary>Fills an arc centred on +X, tapering toward its ends for a crescent silhouette.</summary>
+        private static void FillArc(Color32[] px, int w, int h, int cx, int cy, int inner, int outer, float halfAngleDegrees, Color32 color)
+        {
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    float dx = x + 0.5f - cx;
+                    float dy = y + 0.5f - cy;
+                    float radius = Mathf.Sqrt(dx * dx + dy * dy);
+                    if (radius < inner || radius > outer)
+                    {
+                        continue;
+                    }
+
+                    float angle = Mathf.Abs(Mathf.Atan2(dy, dx) * Mathf.Rad2Deg);
+                    if (angle > halfAngleDegrees)
+                    {
+                        continue;
+                    }
+
+                    float t = angle / halfAngleDegrees;
+                    float thickness = (outer - inner) * (1f - t * t * 0.75f);
+                    if (radius <= inner + thickness)
                     {
                         px[y * w + x] = color;
                     }

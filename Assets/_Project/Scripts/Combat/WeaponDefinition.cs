@@ -1,46 +1,37 @@
 using UnityEngine;
+using BattleForYourSoul.Weapons;
 
 namespace BattleForYourSoul.Combat
 {
     /// <summary>
-    /// Authoring-time definition of a weapon. Immutable data only: all per-shot runtime state lives
-    /// on <see cref="WeaponController"/>, so two actors can share one definition safely.
+    /// Authoring-time definition of a weapon. Immutable data only: cooldowns, modifiers and reusable
+    /// buffers live on <see cref="WeaponController"/>, so two actors can share one definition safely.
+    /// The two actions are separate assets so a designer can retune an attack without touching the
+    /// weapon's identity or its pickups.
     /// </summary>
     [CreateAssetMenu(menuName = "BattleForYourSoul/Weapon", fileName = "Weapon")]
     public sealed class WeaponDefinition : ScriptableObject
     {
-        [Header("Firing")]
-        [Tooltip("Seconds between shots.")]
-        [SerializeField, Min(0.01f)] private float fireInterval = 0.32f;
+        [Header("Identity")]
+        [SerializeField] private string id = "weapon";
+        [SerializeField] private string displayName = "Weapon";
+        [SerializeField, TextArea] private string description = "";
 
-        [Tooltip("Projectiles fired per shot.")]
-        [SerializeField, Min(1)] private int projectilesPerShot = 1;
+        [Tooltip("Sprite used by the physical pickup and the selection label.")]
+        [SerializeField] private Sprite pickupSprite;
 
-        [Tooltip("Total arc in degrees spread across the projectiles of one shot.")]
-        [SerializeField, Range(0f, 180f)] private float spreadDegrees = 0f;
+        [Header("Actions")]
+        [Tooltip("Fired by the primary attack input.")]
+        [SerializeField] private WeaponActionDefinition primaryAction;
 
-        [Header("Targeting")]
-        [Tooltip("Only enemies within this radius (world units) are targeted.")]
-        [SerializeField, Min(0.1f)] private float targetRange = 7f;
+        [Tooltip("Fired by the secondary attack input.")]
+        [SerializeField] private WeaponActionDefinition specialAction;
 
-        [Header("Projectile")]
-        [SerializeField, Min(0.1f)] private float projectileSpeed = 14f;
-
-        [Tooltip("Seconds before a projectile expires on its own.")]
-        [SerializeField, Min(0.01f)] private float projectileLifetime = 1.1f;
-
-        [SerializeField, Min(0f)] private float damage = 1f;
-
-        [Tooltip("Sprite applied to each fired projectile.")]
-        [SerializeField] private Sprite projectileSprite;
-
-        public float FireInterval => fireInterval;
-        public int ProjectilesPerShot => projectilesPerShot;
-        public float SpreadDegrees => spreadDegrees;
-        public float TargetRange => targetRange;
-        public float ProjectileSpeed => projectileSpeed;
-        public float ProjectileLifetime => projectileLifetime;
-        public float Damage => damage;
-        public Sprite ProjectileSprite => projectileSprite;
+        public string Id => id;
+        public string DisplayName => displayName;
+        public string Description => description;
+        public Sprite PickupSprite => pickupSprite;
+        public WeaponActionDefinition PrimaryAction => primaryAction;
+        public WeaponActionDefinition SpecialAction => specialAction;
     }
 }

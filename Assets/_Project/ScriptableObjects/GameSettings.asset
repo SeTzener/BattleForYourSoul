@@ -24,3 +24,7 @@ MonoBehaviour:
   - {x: -3.2, y: 3.55}
   - {x: 0, y: 3.85}
   - {x: 3.2, y: 3.55}
+  weaponPedestalPositions:
+  - {x: -4, y: -1.2}
+  - {x: 0, y: -1.8}
+  - {x: 4, y: -1.2}

@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1955f3e51464e48b88ac39ed5ddcc463, type: 3}
+  m_Name: Weapon_Sword
+  m_EditorClassIdentifier: BattleForYourSoul::BattleForYourSoul.Combat.WeaponDefinition
+  id: sword
+  displayName: Sword
+  description: Close-range slash and a wide cleave.
+  pickupSprite: {fileID: 21300000, guid: 012d94d6621a14190812266036f9199a, type: 3}
+  primaryAction: {fileID: 11400000, guid: 2f1da858d040a4fa4a9d081f36815306, type: 2}
+  specialAction: {fileID: 11400000, guid: 41dc17f5ea81a4b58a8c00a2f8c018b0, type: 2}
