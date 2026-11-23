@@ -22,7 +22,7 @@ changes.
 
 | What you want to change | Asset | Notes |
 |---|---|---|
-| Player stats, sprite, body, starting weapon | `Player_Default.asset` | Max HP, move speed, accel/decel, collider size/offset |
+| Player stats, sprite, body, dash, starting weapon | `Player_Default.asset` | Max HP, move speed, accel/decel, dash speed/duration/cooldown/grace, collider size/offset |
 | Enemy type | `Enemy_Grunt.asset` | Sprite, HP, speed, **aggro radius**, contact damage, XP, collider radius |
 | Weapon | `Weapons/Weapon_*.asset` | Display name, description, **pickup sprite**, primary and special action refs |
 | One weapon action | `Weapons/Actions/Action_*.asset` | Shape (melee arc / line / projectile), cooldown, damage, reach, arc/width, projectile settings |
@@ -71,6 +71,28 @@ to stages referencing it.
 
 After the last authored stage the run **escalates** (the final room repeats while monster level keeps
 climbing). Tick `loopStages` on the progression to restart from stage one instead.
+
+## Movement and dash
+
+Normal walking is tuned on `Player_Default.asset` (`moveSpeed`, `acceleration`, `deceleration`).
+Dash adds four fields:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `dashSpeed` | 14 | World units per second while dashing |
+| `dashDuration` | 0.18 | Seconds the dash velocity is held |
+| `dashCooldown` | 1.2 | Recharge time for the normal dash charge |
+| `dashGrace` | 0.08 | Brief damage immunity after the dash ends |
+
+Dash has its own Input System action (`Dash`, bound to Space and gamepad A) alongside `Move`, so
+gameplay never reads a device directly. It always travels in the player's last facing direction and
+passes through enemies: while dashing, the player's collider ignores every live enemy collider and
+incoming damage is suppressed, then both are restored at the end. The short grace window keeps an
+enemy the player lands on from hitting on the very next frame.
+
+`PlayerDash` owns charges, cooldown and pass-through; `PlayerMovement` owns the body velocity for the
+dash's duration. Both are scene components — no dash state lives in the definition asset. A stage
+teleport cancels an active dash and clears its immunity and collision overrides.
 
 ## Samsara and weapons
 
@@ -121,6 +143,10 @@ queue alongside it.
   recolour or describe them. Samsara's single door carries one of these categories as usual.
 - To add an upgrade: duplicate an asset under `Upgrades/`, set its modifiers and category, then add it
   to the pool. Percent stats are whole numbers (12 = +12%).
+- `InstantDashCharges` grants dash charges that are **always ready**, independent of the normal
+  cooldown. A granted charge is not consumed permanently: it refills whenever a dash ends, so one
+  charge means one free dash is always available. The seeded **Phase Step** upgrade in the Mobility
+  category grants one; stacking the upgrade grants more consecutive free dashes.
 - An upgrade can also set a **weapon filter** (`weaponFilter`). Leave it empty for a global upgrade
   that every weapon can roll; fill it with one or more weapons for a weapon-specific effect. Effects
   from the filter are still upgrades, not extra actions — they are only offered while the matching

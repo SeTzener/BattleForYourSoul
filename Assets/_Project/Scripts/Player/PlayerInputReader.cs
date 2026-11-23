@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -21,10 +22,17 @@ namespace BattleForYourSoul.Player
         [Tooltip("Action path within the actions asset.")]
         [SerializeField] private string moveActionPath = "Player/Move";
 
+        [Tooltip("Button action used for the dash.")]
+        [SerializeField] private string dashActionPath = "Player/Dash";
+
         private InputAction _moveAction;
+        private InputAction _dashAction;
 
         /// <inheritdoc />
         public Vector2 Move { get; private set; }
+
+        /// <inheritdoc />
+        public event Action DashPressed;
 
         private void Awake()
         {
@@ -40,21 +48,34 @@ namespace BattleForYourSoul.Player
             {
                 Debug.LogError($"[PlayerInputReader] Action '{moveActionPath}' not found in '{asset.name}'.", this);
             }
+
+            _dashAction = asset.FindAction(dashActionPath);
+            if (_dashAction == null)
+            {
+                Debug.LogError($"[PlayerInputReader] Action '{dashActionPath}' not found in '{asset.name}'.", this);
+            }
         }
 
         private void OnEnable()
         {
             _moveAction?.Enable();
+            _dashAction?.Enable();
         }
 
         private void OnDisable()
         {
             _moveAction?.Disable();
+            _dashAction?.Disable();
             Move = Vector2.zero;
         }
 
         private void Update()
         {
+            if (_dashAction != null && _dashAction.WasPressedThisFrame())
+            {
+                DashPressed?.Invoke();
+            }
+
             if (_moveAction == null)
             {
                 return;

@@ -18,6 +18,9 @@ namespace BattleForYourSoul.Enemies
         /// <summary>Number of currently live enemies.</summary>
         public int Count => _enemies.Count;
 
+        /// <summary>Live enemies, for systems that need to touch every body without a scene search.</summary>
+        public IReadOnlyList<Enemy> Enemies => _enemies;
+
         public void Register(Enemy enemy)
         {
             if (enemy == null || _enemies.Contains(enemy))

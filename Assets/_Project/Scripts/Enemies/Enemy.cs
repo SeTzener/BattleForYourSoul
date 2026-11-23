@@ -38,6 +38,9 @@ namespace BattleForYourSoul.Enemies
         /// <summary>XP this enemy is worth when killed, already scaled by its monster level.</summary>
         public float XpReward => _xpReward;
 
+        /// <summary>Body collider, so movement effects can ignore it without searching the scene.</summary>
+        public Collider2D BodyCollider => bodyCollider;
+
         /// <summary>Monster level this enemy was spawned at.</summary>
         public int MonsterLevel => _monsterLevel;
 

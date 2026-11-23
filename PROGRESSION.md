@@ -106,6 +106,19 @@ Weapon-specific behaviours such as bow multishot/ricochet and sword longer reach
 > For now they're upgrades but don' forget these are just placeholders. The real weapons are gonna be
 > different. I just need the mechanics to be in place.
 
+### Dash
+
+A dedicated `Dash` action (Space / gamepad A) dashes the player in their current facing direction.
+`PlayerDash` owns the run state: one normal charge with a cooldown, plus optional always-ready
+charges from upgrades. While dashing the player ignores all enemy colliders and takes no damage; a
+short grace window after the dash protects against an enemy they land on. `PlayerMovement` holds the
+dash velocity for the authored duration, then normal movement resumes. A stage teleport cancels an
+active dash and clears its immunity and collision overrides.
+
+The seeded **Phase Step** Mobility upgrade grants one instant dash charge. Instant charges are not
+consumed permanently — they refill whenever a dash ends — so taking it always leaves one
+cooldown-free dash available. Stacking the upgrade grants more consecutive free dashes.
+
 ### XP flow
 
 1. Enemy dies → `EnemySpawner.EnemyDied` and its live count drops.
@@ -124,7 +137,7 @@ stage after the weapon is chosen.
 Level-up choices are `UpgradeDefinition` assets carrying `StatModifier`s, gathered into an
 `UpgradePool` asset. Each upgrade may name a `category`; that is how a door-filtered clear choice is
 built. `PlayerStats` aggregates the chosen ones and pushes the result into `Health`,
-`WeaponController` and `PlayerMovement`.
+`WeaponController`, `PlayerMovement` and `PlayerDash`.
 
 Seeded placeholder categories: **Shots**, **Mobility**, **Vitality**.
 
@@ -134,10 +147,10 @@ matching weapon is equipped, so a bow run never sees sword-only cards and vice v
 keeps one set of accumulated totals across weapon swaps inside Samsara, so trying a different weapon
 never loses an upgrade.
 
-Current upgrades: projectile damage, fire rate, move speed, max health, extra projectile, projectile
-speed, plus weapon-filtered placeholders — sword reach/edge/impact, spear reach/broadhead/quick
-thrust, bow split/ricochet/impact. Ricochet and impact burst are implemented as inert-by-default
-effects: they do nothing until their upgrade is taken.
+Current upgrades: projectile damage, fire rate, move speed, instant dash charge, max health, extra
+projectile, projectile speed, plus weapon-filtered placeholders — sword reach/edge/impact, spear
+reach/broadhead/quick thrust, bow split/ricochet/impact. Ricochet and impact burst are implemented
+as inert-by-default effects: they do nothing until their upgrade is taken.
 
 ## Open questions / to tune
 

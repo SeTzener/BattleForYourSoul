@@ -23,6 +23,9 @@ namespace BattleForYourSoul.Progression
         RangeFlat,
         RicochetBounces,
         ImpactRadius,
+
+        // Adds a dash charge that is always ready, independent of the normal cooldown.
+        InstantDashCharges,
     }
 
     /// <summary>One additive modifier inside an upgrade, applied on top of everything before it.</summary>

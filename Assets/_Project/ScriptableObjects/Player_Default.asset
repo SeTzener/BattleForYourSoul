@@ -18,6 +18,10 @@ MonoBehaviour:
   moveSpeed: 5
   acceleration: 60
   deceleration: 80
+  dashSpeed: 14
+  dashDuration: 0.18
+  dashCooldown: 1.2
+  dashGrace: 0.08
   colliderSize: {x: 0.45, y: 0.5}
   colliderOffset: {x: 0, y: 0.25}
   startingWeapon: {fileID: 11400000, guid: ea83a96353cd94e06818f84f6a969a94, type: 2}
