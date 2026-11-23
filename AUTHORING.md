@@ -10,13 +10,36 @@ ScriptableObject asset under `Assets/_Project/ScriptableObjects`, or a sprite un
 
 - **Definition assets are seeded once, then owned by you.** The scene builder creates them with
   sensible defaults the first time only. After that it never overwrites a value you set; it only
-  backfills newly-required empty references.
+  backfills newly-required empty references and newly-required positive values.
 - **Prefabs and the scene are generated.** They are rebuilt every time you run the builder, so put
   tuning in assets, not in prefab overrides or scene components.
+- **Never delete an asset or a scene without explicit approval.** Generated artifacts can be
+  rebuilt, but authored assets are yours and are only ever backfilled, never replaced.
 
 Rebuild the scene with **Tools ▸ BattleForYourSoul ▸ Build Game Scene**. Runtime systems read the
 assets on start, so editing an asset and entering Play mode (no rebuild) is enough to see most
 changes.
+
+## Agreed technical conventions
+
+These were established with the first milestones and apply to every new system:
+
+- **Unity 6 LTS, 2D URP, 2D Physics, Input System, 2D Tilemap, Pixel Perfect Camera and
+  ScriptableObjects.** Built-in and official packages only.
+- **Composition over inheritance.** Behaviour lives in small components that collaborate through
+  wired references.
+- **No global singletons or static state.** Each scene owns its own registries and controllers;
+  the builder wires references directly.
+- **Runtime state never lives in a definition asset.** Assets are immutable tuning data; current
+  health, charges, cooldowns and upgrade totals stay on scene components.
+- **No scene-wide searches in gameplay.** Cache references at build/start time; scene-scoped
+  registries (such as `EnemyRegistry`) provide live lookups.
+- **No per-frame allocations.** Reuse lists and filters, and pool transient objects (projectiles,
+  enemies, hit VFX).
+- **Input acquisition is separate from gameplay.** Only input reader components touch the Input
+  System; gameplay consumes source-agnostic interfaces (`IPlayerInput`, `IWeaponActions`).
+- **Isometric sorting is centralised.** `IsometricSpriteSorter` derives depth from world position;
+  never assign arbitrary fixed per-sprite sort orders.
 
 ## Where things live
 

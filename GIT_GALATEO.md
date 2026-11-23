@@ -28,6 +28,14 @@ Examples of good one-line messages:
 - `Add health, damage and contact-damage primitives`
 - `Add combat HUD and game-over flow`
 
+## Approval before sharing work
+
+- Nothing is **committed, pushed or opened as a PR** without the developer's explicit approval for
+  that action. Finish and verify the work first, then ask.
+- Approval is per action: ask again before each of commit, push and PR. When the developer approves
+  a combined "commit, push and open the PR", that one approval covers the whole sequence.
+- Never amend, rebase or force-push shared history without explicit approval.
+
 ## Pull requests
 
 - The PR title must explain the **entire scope** of the change. Do not use short milestone labels.
