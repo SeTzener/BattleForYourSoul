@@ -1281,16 +1281,25 @@ namespace BattleForYourSoul.EditorTools
             barRect.anchoredPosition = new Vector2(24f, -24f);
             barRect.sizeDelta = new Vector2(340f, 30f);
 
+            // Pale ghost sits behind the red fill: it keeps marking the lost health for a moment
+            // after damage, then shrinks to the real value. Created first so it draws underneath.
+            // Bars use a sprite-less solid-colour Image, so the fill is driven by the rect's right
+            // anchor rather than Image.fillAmount (which Filled mode ignores without a sprite).
+            Image healthGhost = CreateImage("Ghost", barBackground.transform, new Color32(252, 222, 180, 210));
+            RectTransform ghostRect = healthGhost.rectTransform;
+            ghostRect.anchorMin = Vector2.zero;
+            ghostRect.anchorMax = Vector2.one;
+            ghostRect.offsetMin = Vector2.zero;
+            ghostRect.offsetMax = Vector2.zero;
+            healthGhost.raycastTarget = false;
+
             Image healthFill = CreateImage("Fill", barBackground.transform, new Color32(206, 72, 84, 255));
             RectTransform fillRect = healthFill.rectTransform;
             fillRect.anchorMin = Vector2.zero;
             fillRect.anchorMax = Vector2.one;
-            fillRect.offsetMin = new Vector2(4f, 4f);
-            fillRect.offsetMax = new Vector2(-4f, -4f);
-            healthFill.type = Image.Type.Filled;
-            healthFill.fillMethod = Image.FillMethod.Horizontal;
-            healthFill.fillOrigin = (int)Image.OriginHorizontal.Left;
-            healthFill.fillAmount = 1f;
+            fillRect.offsetMin = Vector2.zero;
+            fillRect.offsetMax = Vector2.zero;
+            healthFill.raycastTarget = false;
 
             // Kill counter, anchored top-right.
             Text killLabel = CreateText("KillCounter", canvasGo.transform, font, "Kills: 0", TextAnchor.UpperRight);
@@ -1348,13 +1357,10 @@ namespace BattleForYourSoul.EditorTools
             Image xpFill = CreateImage("Fill", xpBackground.transform, new Color32(64, 214, 158, 255));
             RectTransform xpFillRect = xpFill.rectTransform;
             xpFillRect.anchorMin = Vector2.zero;
-            xpFillRect.anchorMax = Vector2.one;
-            xpFillRect.offsetMin = new Vector2(3f, 3f);
-            xpFillRect.offsetMax = new Vector2(-3f, -3f);
-            xpFill.type = Image.Type.Filled;
-            xpFill.fillMethod = Image.FillMethod.Horizontal;
-            xpFill.fillOrigin = (int)Image.OriginHorizontal.Left;
-            xpFill.fillAmount = 0f;
+            xpFillRect.anchorMax = new Vector2(0f, 1f);
+            xpFillRect.offsetMin = Vector2.zero;
+            xpFillRect.offsetMax = Vector2.zero;
+            xpFill.raycastTarget = false;
 
             Text levelLabel = CreateText("LevelLabel", canvasGo.transform, font, "Lv 1", TextAnchor.MiddleCenter);
             RectTransform levelRect = levelLabel.rectTransform;
@@ -1428,6 +1434,7 @@ namespace BattleForYourSoul.EditorTools
 
             var hud = canvasGo.AddComponent<GameHud>();
             SetSerializedReference(hud, "healthFill", healthFill);
+            SetSerializedReference(hud, "healthGhost", healthGhost);
             SetSerializedReference(hud, "killLabel", killLabel);
             SetSerializedReference(hud, "playerHealth", player.GetComponent<Health>());
             SetSerializedReference(hud, "spawner", spawner);
