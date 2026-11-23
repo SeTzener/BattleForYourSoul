@@ -20,6 +20,16 @@ Rebuild the scene with **Tools ▸ BattleForYourSoul ▸ Build Game Scene**. Run
 assets on start, so editing an asset and entering Play mode (no rebuild) is enough to see most
 changes.
 
+## Mobile controls
+
+The generated `HUD` canvas contains a `MobileControls` root with a left joystick and three buttons.
+It is authored inactive and `MobileControlsVisibility` activates it only on `Application.isMobilePlatform`,
+so desktop Play sessions and desktop builds do not create a virtual input device. The controls feed a
+virtual **Gamepad** (`leftStick`, `buttonSouth`, `buttonWest`, `buttonNorth`), so they drive the
+existing `Move`, `Dash`, `PrimaryAttack` and `SecondaryAttack` bindings without touch-specific code
+in gameplay. Upgrade the bindings in `InputSystem_Actions.inputactions` if the button mapping should
+change; no scene edit is needed.
+
 ## Agreed technical conventions
 
 These were established with the first milestones and apply to every new system:
@@ -175,6 +185,27 @@ queue alongside it.
   from the filter are still upgrades, not extra actions — they are only offered while the matching
   weapon is equipped. The seeded sword/spear/bow effect upgrades are placeholders for the real
   weapon-specific upgrades to come.
+
+## Android build
+
+The project is configured for Android with application id `com.setzener.battleforyoursoul`, landscape
+orientation (portrait autorotation disabled), min SDK 26 and target SDK 36. Android Build Support,
+the JDK and the SDK/NDK tools are installed with the Unity version used by this project.
+
+A local development build is produced in batch mode with the checked-in Android build profile:
+
+```sh
+unity build --profile Android --output Builds/Android/BattleForYourSoul.apk
+```
+
+The profile is at `Assets/Settings/Build Profiles/Android.asset` and uses the project's global scene
+list. This is an unsigned/debug-style build for local install; a Play Store release still needs a
+keystore and signing configuration, which are deliberately not committed.
+
+Graphics APIs are pinned to OpenGL ES 3 only for Android. Unity 6 otherwise prefers Vulkan, whose
+software implementation in the Android emulator cannot render URP geometry (the screen stays a solid
+camera-clear colour even though the player runs). Do not re-enable Vulkan in Player Settings unless
+the target device has been verified.
 
 ## Adding a new definition type
 

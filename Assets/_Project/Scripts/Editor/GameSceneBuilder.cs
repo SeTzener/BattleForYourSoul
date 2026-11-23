@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.OnScreen;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.Tilemaps;
@@ -1251,6 +1252,89 @@ namespace BattleForYourSoul.EditorTools
             return doors;
         }
 
+        /// <summary>
+        /// Builds a virtual Gamepad from uGUI controls. OnScreenStick and OnScreenButton components
+        /// with Gamepad control paths are merged by the Input System into one device, so existing
+        /// Player/Move, Dash and attack actions work without any touch-specific gameplay code.
+        /// </summary>
+        private static GameObject BuildMobileControls(Transform canvas, Font font)
+        {
+            var root = new GameObject("MobileControls", typeof(RectTransform));
+            root.transform.SetParent(canvas, false);
+            RectTransform rootRect = root.GetComponent<RectTransform>();
+            rootRect.anchorMin = Vector2.zero;
+            rootRect.anchorMax = Vector2.one;
+            rootRect.offsetMin = Vector2.zero;
+            rootRect.offsetMax = Vector2.zero;
+
+            // Static well behind the moving stick: the stick can travel without losing its origin.
+            Image well = CreateImage("MoveWell", root.transform, new Color32(40, 36, 56, 150));
+            PlaceAtAnchor(well.rectTransform, Vector2.zero, new Vector2(140f, 140f), new Vector2(160f, 160f));
+            well.raycastTarget = false;
+
+            Image stick = CreateImage("MoveStick", root.transform, new Color32(112, 136, 194, 210));
+            PlaceAtAnchor(stick.rectTransform, Vector2.zero, new Vector2(140f, 140f), new Vector2(160f, 160f));
+
+            var onScreenStick = stick.gameObject.AddComponent<OnScreenStick>();
+            SetSerializedString(onScreenStick, "m_ControlPath", "<Gamepad>/leftStick");
+            SetSerializedFloat(onScreenStick, "m_MovementRange", 56f);
+            SetSerializedInt(onScreenStick, "m_Behaviour", (int)OnScreenStick.Behaviour.RelativePositionWithStaticOrigin);
+            SetSerializedBool(onScreenStick, "m_UseIsolatedInputActions", true);
+
+            Image knob = CreateImage("Knob", stick.transform, new Color32(224, 232, 248, 240));
+            PlaceAtAnchor(knob.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(72f, 72f));
+            knob.raycastTarget = false;
+
+            CreateTouchButton(
+                "DashButton", root.transform, font, new Color32(214, 140, 62, 235),
+                "DASH", new Vector2(-96f, 204f), new Vector2(120f, 120f), "<Gamepad>/buttonSouth");
+            CreateTouchButton(
+                "PrimaryButton", root.transform, font, new Color32(66, 124, 206, 235),
+                "ATK", new Vector2(-96f, 64f), new Vector2(140f, 140f), "<Gamepad>/buttonWest");
+            CreateTouchButton(
+                "SecondaryButton", root.transform, font, new Color32(146, 92, 196, 235),
+                "ALT", new Vector2(-250f, 64f), new Vector2(120f, 120f), "<Gamepad>/buttonNorth");
+
+            root.SetActive(false);
+            return root;
+        }
+
+        private static Image CreateTouchButton(
+            string name,
+            Transform parent,
+            Font font,
+            Color32 color,
+            string label,
+            Vector2 anchoredPosition,
+            Vector2 size,
+            string controlPath)
+        {
+            Image image = CreateImage(name, parent, color);
+            PlaceAtAnchor(image.rectTransform, new Vector2(1f, 0f), anchoredPosition, size);
+
+            var onScreenButton = image.gameObject.AddComponent<OnScreenButton>();
+            SetSerializedString(onScreenButton, "m_ControlPath", controlPath);
+
+            Text text = CreateText("Label", image.transform, font, label, TextAnchor.MiddleCenter);
+            RectTransform textRect = text.rectTransform;
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+            text.fontSize = 26;
+            text.color = Color.white;
+            return image;
+        }
+
+        private static void PlaceAtAnchor(RectTransform rect, Vector2 anchor, Vector2 anchoredPosition, Vector2 size)
+        {
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = size;
+        }
+
         private static LevelUpController BuildHud(
             GameObject player,
             EnemySpawner spawner,
@@ -1271,6 +1355,9 @@ namespace BattleForYourSoul.EditorTools
             new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
 
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+            // Authored inactive: MobileControlsVisibility activates it on touch-first platforms.
+            GameObject mobileControls = BuildMobileControls(canvasGo.transform, font);
 
             // Player health bar, anchored top-left.
             Image barBackground = CreateImage("HealthBar", canvasGo.transform, new Color32(18, 16, 26, 220));
@@ -1463,6 +1550,10 @@ namespace BattleForYourSoul.EditorTools
             SetSerializedReference(levelUp, "titleLabel", levelTitle);
             SetSerializedReference(levelUp, "hintLabel", levelHint);
             SetSerializedArray(levelUp, "cards", cards);
+
+            var mobileVisibility = canvasGo.AddComponent<MobileControlsVisibility>();
+            SetSerializedReference(mobileVisibility, "controlsRoot", mobileControls);
+
             return levelUp;
         }
 
@@ -1633,6 +1724,20 @@ namespace BattleForYourSoul.EditorTools
             }
 
             property.intValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void SetSerializedString(Object target, string propertyName, string value)
+        {
+            var serialized = new SerializedObject(target);
+            SerializedProperty property = serialized.FindProperty(propertyName);
+            if (property == null)
+            {
+                Debug.LogError($"[GameSceneBuilder] No serialized property '{propertyName}' on {target.GetType().Name}.");
+                return;
+            }
+
+            property.stringValue = value;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
