@@ -49,7 +49,9 @@ Tests live in `Assets/_Project/Tests` and target mechanics, not placeholder art 
   monster scaling, the XP curve, default weapon modifiers and upgrade weapon filters.
 - **PlayMode** — stateful components wired from minimal objects built in test code, never the
   generated scene: health damage/immunity/death, XP and level-ups, upgrade aggregation, dash
-  charges/cooldown/grace/teleport, and the HUD's delayed ghost bar.
+  charges/cooldown/grace/teleport, the HUD's delayed ghost bar, and combat mechanics (weapon
+  cooldowns, melee arc and layer filtering, impact radius, projectile speed/spread and pool reuse,
+  and VFX sweep/fade/lifetime).
 
 Run them from Unity's Test Runner or with `unity test . --mode EditMode` /
 `unity test . --mode PlayMode`. When using a connected Editor, stop Play mode first: an EditMode
