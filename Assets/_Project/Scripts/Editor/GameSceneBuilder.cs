@@ -273,6 +273,13 @@ namespace BattleForYourSoul.EditorTools
             var movement = player.AddComponent<PlayerMovement>();
             SetSerializedReference(movement, "definition", definition);
 
+            var dash = player.AddComponent<PlayerDash>();
+            SetSerializedReference(dash, "definition", definition);
+            SetSerializedFloat(dash, "dashSpeed", definition != null ? definition.DashSpeed : 14f);
+            SetSerializedFloat(dash, "dashDuration", definition != null ? definition.DashDuration : 0.18f);
+            SetSerializedFloat(dash, "dashCooldown", definition != null ? definition.DashCooldown : 1.2f);
+            SetSerializedFloat(dash, "invulnerabilityGrace", definition != null ? definition.DashGrace : 0.08f);
+
             var visuals = player.AddComponent<PlayerVisuals>();
             SetSerializedReference(visuals, "definition", definition);
 
@@ -546,7 +553,31 @@ namespace BattleForYourSoul.EditorTools
 
             SeedReferenceIfMissing(definition, "sprite", LoadSprite(PlayerSpritePath));
             SeedReferenceIfMissing(definition, "startingWeapon", defaultWeapon);
+
+            // Newer dash fields are missing from assets created before M9; backfill only values
+            // that must be positive. A designer is free to author zero cooldown/grace.
+            var serialized = new SerializedObject(definition);
+            bool changed = SeedPositiveFloat(serialized.FindProperty("dashSpeed"), 14f);
+            changed |= SeedPositiveFloat(serialized.FindProperty("dashDuration"), 0.18f);
+            if (changed)
+            {
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(definition);
+                AssetDatabase.SaveAssets();
+            }
+
             return definition;
+        }
+
+        private static bool SeedPositiveFloat(SerializedProperty property, float value)
+        {
+            if (property == null || property.floatValue > 0f)
+            {
+                return false;
+            }
+
+            property.floatValue = value;
+            return true;
         }
 
         private static ProgressionDefinition EnsureProgressionDefinition()
@@ -580,6 +611,7 @@ namespace BattleForYourSoul.EditorTools
                 EnsureUpgrade("Upgrade_FleetFooted", "fleet-footed", "Fleet Footed", "Move 8% faster.", new Color32(120, 214, 120, 255), icon, mobility, UpgradeStat.MoveSpeedPercent, 8f),
                 EnsureUpgrade("Upgrade_SwiftStride", "swift-stride", "Swift Stride", "Move 10% faster.", new Color32(128, 232, 180, 255), icon, mobility, UpgradeStat.MoveSpeedPercent, 10f),
                 EnsureUpgrade("Upgrade_SureFooting", "sure-footing", "Sure Footing", "Move 6% faster.", new Color32(156, 226, 142, 255), icon, mobility, UpgradeStat.MoveSpeedPercent, 6f),
+                EnsureUpgrade("Upgrade_InstantDash", "instant-dash", "Phase Step", "Gain a dash charge that is always ready.", new Color32(132, 236, 224, 255), icon, mobility, UpgradeStat.InstantDashCharges, 1f),
 
                 EnsureUpgrade("Upgrade_Vitality", "vitality", "Vitality", "Gain 20 max health.", new Color32(240, 120, 168, 255), icon, vitality, UpgradeStat.MaxHealthFlat, 20f),
                 EnsureUpgrade("Upgrade_IronWill", "iron-will", "Iron Will", "Gain 14 max health.", new Color32(250, 150, 180, 255), icon, vitality, UpgradeStat.MaxHealthFlat, 14f),
@@ -988,6 +1020,11 @@ namespace BattleForYourSoul.EditorTools
             SetSerializedReference(spawner, "registry", registry);
             SetSerializedReference(spawner, "target", player.transform);
 
+            var dash = player.GetComponent<PlayerDash>();
+            SetSerializedReference(dash, "bodyCollider", player.GetComponent<Collider2D>());
+            SetSerializedReference(dash, "enemyRegistry", registry);
+            SetSerializedReference(dash, "health", player.GetComponent<Health>());
+
             var input = player.AddComponent<WeaponInputReader>();
             var weapon = player.AddComponent<WeaponController>();
             SetSerializedReference(weapon, "projectilePrefab", projectilePrefab.GetComponent<Projectile>());
@@ -1106,6 +1143,7 @@ namespace BattleForYourSoul.EditorTools
             SetSerializedReference(stats, "health", player.GetComponent<Health>());
             SetSerializedReference(stats, "weapon", player.GetComponent<WeaponController>());
             SetSerializedReference(stats, "movement", player.GetComponent<PlayerMovement>());
+            SetSerializedReference(stats, "dash", player.GetComponent<PlayerDash>());
 
             // The stage owns the monster level and feeds it to the spawner; the director listens to
             // room-clear events and owns door/advance state. Remaining references are wired once the

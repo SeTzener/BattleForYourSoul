@@ -24,6 +24,7 @@ namespace BattleForYourSoul.Player
         [SerializeField] private Health health;
         [SerializeField] private WeaponController weapon;
         [SerializeField] private PlayerMovement movement;
+        [SerializeField] private PlayerDash dash;
 
         private float _baseMaxHealth;
         private float _maxHealthBonus;
@@ -36,6 +37,7 @@ namespace BattleForYourSoul.Player
         private float _ricochetBounces;
         private float _impactRadius;
         private int _extraProjectiles;
+        private int _instantDashCharges;
 
         private void Awake()
         {
@@ -102,6 +104,9 @@ namespace BattleForYourSoul.Player
                 case UpgradeStat.ImpactRadius:
                     _impactRadius += modifier.Value;
                     break;
+                case UpgradeStat.InstantDashCharges:
+                    _instantDashCharges += Mathf.RoundToInt(modifier.Value);
+                    break;
             }
         }
 
@@ -132,6 +137,11 @@ namespace BattleForYourSoul.Player
             if (movement != null)
             {
                 movement.SetSpeedMultiplier(_moveSpeedMultiplier);
+            }
+
+            if (dash != null)
+            {
+                dash.SetInstantCharges(_instantDashCharges);
             }
         }
     }

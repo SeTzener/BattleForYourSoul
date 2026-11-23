@@ -16,6 +16,7 @@ namespace BattleForYourSoul.Combat
 
         private float _current;
         private bool _initialized;
+        private bool _damageImmune;
 
         public float Max => maxHealth;
 
@@ -26,6 +27,12 @@ namespace BattleForYourSoul.Combat
         public float Normalized => maxHealth > 0f ? Mathf.Clamp01(Current / maxHealth) : 0f;
 
         public bool IsAlive => Current > 0f;
+
+        /// <summary>
+        /// While set, all incoming damage is ignored. Used by short-lived effects such as a dash;
+        /// the owner is responsible for clearing it.
+        /// </summary>
+        public bool IsDamageImmune => _damageImmune;
 
         /// <summary>Raised after any change to <see cref="Current"/>.</summary>
         public event Action<Health> Changed;
@@ -62,7 +69,7 @@ namespace BattleForYourSoul.Combat
         /// <inheritdoc />
         public void TakeDamage(in DamageInfo damage)
         {
-            if (!IsAlive || damage.Amount <= 0f)
+            if (!IsAlive || _damageImmune || damage.Amount <= 0f)
             {
                 return;
             }
@@ -75,6 +82,12 @@ namespace BattleForYourSoul.Combat
             {
                 Died?.Invoke(this);
             }
+        }
+
+        /// <summary>Toggles damage immunity for effects that must guarantee no damage is taken.</summary>
+        public void SetDamageImmune(bool immune)
+        {
+            _damageImmune = immune;
         }
 
         public void Heal(float amount)
@@ -115,6 +128,7 @@ namespace BattleForYourSoul.Combat
         {
             _current = maxHealth;
             _initialized = true;
+            _damageImmune = false;
             Changed?.Invoke(this);
         }
     }

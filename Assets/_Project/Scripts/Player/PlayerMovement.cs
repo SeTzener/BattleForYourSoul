@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using BattleForYourSoul.Core;
 
@@ -31,6 +32,11 @@ namespace BattleForYourSoul.Player
         private IPlayerInput _input;
         private Vector2 _desiredVelocity;
         private float _speedMultiplier = 1f;
+        private Vector2 _dashVelocity;
+        private bool _dashing;
+
+        /// <summary>Raised after a teleport so transient state (such as a dash) can be cancelled.</summary>
+        public event Action Teleported;
 
         /// <summary>Last non-zero input direction in screen space. Presentation reads this.</summary>
         public Vector2 Facing { get; private set; } = Vector2.down;
@@ -40,6 +46,9 @@ namespace BattleForYourSoul.Player
 
         /// <summary>The authored speed, before any upgrade multiplier.</summary>
         public float BaseMoveSpeed => moveSpeed;
+
+        /// <summary>Whether a dash is currently driving this body.</summary>
+        public bool IsDashing => _dashing;
 
         /// <summary>Applies an upgrade speed multiplier. Pushed by the player's stats.</summary>
         public void SetSpeedMultiplier(float multiplier)
@@ -66,6 +75,39 @@ namespace BattleForYourSoul.Player
 
             transform.position = new Vector3(position.x, position.y, transform.position.z);
             _desiredVelocity = Vector2.zero;
+            _dashing = false;
+            Teleported?.Invoke();
+        }
+
+        /// <summary>
+        /// Takes over velocity for the dash. The caller owns the timer and calls <see cref="EndDash"/>
+        /// when it expires, so dash duration is authored in one place.
+        /// </summary>
+        public void BeginDash(Vector2 direction, float speed)
+        {
+            if (_body == null)
+            {
+                _body = GetComponent<Rigidbody2D>();
+            }
+
+            if (direction.sqrMagnitude < 0.0001f)
+            {
+                direction = Vector2.down;
+            }
+
+            _dashVelocity = direction.normalized * Mathf.Max(0f, speed);
+            _dashing = true;
+
+            if (_body != null)
+            {
+                _body.linearVelocity = _dashVelocity;
+            }
+        }
+
+        /// <summary>Returns velocity control to normal movement.</summary>
+        public void EndDash()
+        {
+            _dashing = false;
         }
 
         private void Awake()
@@ -100,6 +142,18 @@ namespace BattleForYourSoul.Player
 
         private void FixedUpdate()
         {
+            // A dash overrides normal movement for its whole duration; otherwise acceleration
+            // would immediately bleed away the dash velocity.
+            if (_dashing)
+            {
+                if (_body != null)
+                {
+                    _body.linearVelocity = _dashVelocity;
+                }
+
+                return;
+            }
+
             if (_desiredVelocity.sqrMagnitude > 0.0001f && acceleration > 0f)
             {
                 _body.linearVelocity = Vector2.MoveTowards(_body.linearVelocity, _desiredVelocity, acceleration * Time.fixedDeltaTime);
