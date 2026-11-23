@@ -152,6 +152,22 @@ projectile, projectile speed, plus weapon-filtered placeholders — sword reach/
 reach/broadhead/quick thrust, bow split/ricochet/impact. Ricochet and impact burst are implemented
 as inert-by-default effects: they do nothing until their upgrade is taken.
 
+## Decisions log
+
+Agreed choices that shape the design. Update this when a decision changes.
+
+- **Samsara and weapons.** The run starts in a no-enemy weapon-selection room with three physical
+  pickups; the chosen weapon is locked for the run on exit. Each weapon has exactly two manual
+  actions (primary/special) and never auto-fires. Sword and spear attacks get pooled one-shot hit
+  VFX (a slash and a thrust respectively); the bow stays projectile-only. Weapon-specific
+  behaviours are upgrade effects, not extra actions. The three weapons, their six actions and the
+  effects are placeholders until the real designs and art arrive.
+- **Dash.** It uses its own button (Space / gamepad A) rather than reusing the existing Jump action.
+  The upgrade effect is **+1 always-ready charge** that refills after each dash — not a global
+  cooldown removal — granted by a **new Mobility upgrade** (Phase Step) instead of replacing one of
+  the existing speed upgrades. Dash passes through enemies with damage suppression and a short
+  grace window afterwards.
+
 ## Open questions / to tune
 
 - **Room shape / door count**: three doors on the far edge is the placeholder. Positions live in
