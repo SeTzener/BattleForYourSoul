@@ -16,6 +16,7 @@ namespace BattleForYourSoul.UI
     {
         [Header("Wiring")]
         [SerializeField] private Image healthFill;
+        [SerializeField] private Image healthGhost;
         [SerializeField] private Text killLabel;
         [SerializeField] private Health playerHealth;
         [SerializeField] private EnemySpawner spawner;
@@ -27,6 +28,17 @@ namespace BattleForYourSoul.UI
         [SerializeField] private Text objectiveLabel;
         [SerializeField] private Text weaponLabel;
         [SerializeField] private WeaponSelection weaponSelection;
+
+        [Header("Damage ghost")]
+        [Tooltip("Seconds the ghost holds the old value after damage before it starts shrinking.")]
+        [SerializeField, Min(0f)] private float ghostDelay = 0.45f;
+
+        [Tooltip("Seconds for the ghost to shrink across the whole bar once the delay ends.")]
+        [SerializeField, Min(0.01f)] private float ghostShrinkDuration = 0.6f;
+
+        private float _ghostFill = 1f;
+        private float _ghostTarget = 1f;
+        private float _ghostDelayRemaining;
 
         private void OnEnable()
         {
@@ -99,12 +111,57 @@ namespace BattleForYourSoul.UI
             }
         }
 
+        private void Update()
+        {
+            if (_ghostDelayRemaining > 0f)
+            {
+                _ghostDelayRemaining -= Time.deltaTime;
+                return;
+            }
+
+            if (_ghostFill <= _ghostTarget || healthGhost == null)
+            {
+                return;
+            }
+
+            float shrinkSpeed = 1f / Mathf.Max(0.01f, ghostShrinkDuration);
+            _ghostFill = Mathf.MoveTowards(_ghostFill, _ghostTarget, shrinkSpeed * Time.deltaTime);
+            SetBarFill(healthGhost, _ghostFill);
+        }
+
+        // The bar images are sprite-less solid colours: Image.Type.Filled ignores fillAmount
+        // without a sprite, so the visible amount is the right edge of the rect instead.
+        private static void SetBarFill(Image image, float amount)
+        {
+            if (image == null)
+            {
+                return;
+            }
+
+            RectTransform rect = image.rectTransform;
+            Vector2 anchorMax = rect.anchorMax;
+            anchorMax.x = Mathf.Clamp01(amount);
+            rect.anchorMax = anchorMax;
+        }
+
         private void HandleHealthChanged(Health health)
         {
-            if (healthFill != null)
+            float value = health.Normalized;
+            SetBarFill(healthFill, value);
+
+            if (value >= _ghostFill)
             {
-                healthFill.fillAmount = health.Normalized;
+                // Healing (or a fresh full-health bar) has no lag: snap the ghost up with it.
+                _ghostFill = value;
+                _ghostTarget = value;
+                _ghostDelayRemaining = 0f;
+                SetBarFill(healthGhost, value);
+                return;
             }
+
+            // Damage leaves the pale bar marking the lost health, then it catches up after a beat.
+            _ghostTarget = value;
+            _ghostDelayRemaining = ghostDelay;
         }
 
         private void HandleKillsChanged(int kills)
@@ -117,10 +174,7 @@ namespace BattleForYourSoul.UI
 
         private void HandleExperienceChanged(Experience value)
         {
-            if (xpFill != null)
-            {
-                xpFill.fillAmount = value.Normalized;
-            }
+            SetBarFill(xpFill, value.Normalized);
 
             if (levelLabel != null)
             {
