@@ -46,8 +46,11 @@ namespace BattleForYourSoul.Combat
         private PrefabPool<AttackVfx> _vfxPool;
         private Transform _vfxRoot;
         private WeaponModifiers _modifiers = WeaponModifiers.Default;
-        private float _primaryCooldown;
-        private float _specialCooldown;
+        // Shared by both actions: while one attack is cooling down, the other cannot fire either.
+        private float _attackCooldown;
+
+        /// <summary>True while either attack is still on cooldown. Used to gate the touch buttons.</summary>
+        public bool IsAttackOnCooldown => _attackCooldown > 0f;
 
         private void Awake()
         {
@@ -125,8 +128,7 @@ namespace BattleForYourSoul.Combat
         public void SetDefinition(WeaponDefinition value)
         {
             definition = value;
-            _primaryCooldown = 0f;
-            _specialCooldown = 0f;
+            _attackCooldown = 0f;
         }
 
         public void SetModifiers(WeaponModifiers modifiers)
@@ -141,29 +143,28 @@ namespace BattleForYourSoul.Combat
                 return;
             }
 
-            _primaryCooldown -= Time.deltaTime;
-            _specialCooldown -= Time.deltaTime;
+            _attackCooldown -= Time.deltaTime;
         }
 
         public void TryUsePrimary()
         {
-            TryUse(definition != null ? definition.PrimaryAction : null, ref _primaryCooldown);
+            TryUse(definition != null ? definition.PrimaryAction : null);
         }
 
         public void TryUseSpecial()
         {
-            TryUse(definition != null ? definition.SpecialAction : null, ref _specialCooldown);
+            TryUse(definition != null ? definition.SpecialAction : null);
         }
 
-        private void TryUse(WeaponActionDefinition action, ref float cooldown)
+        private void TryUse(WeaponActionDefinition action)
         {
-            if (action == null || cooldown > 0f)
+            if (action == null || _attackCooldown > 0f)
             {
                 return;
             }
 
             Execute(action);
-            cooldown = action.Cooldown / Mathf.Max(0.01f, _modifiers.FireRateMultiplier);
+            _attackCooldown = action.Cooldown / Mathf.Max(0.01f, _modifiers.FireRateMultiplier);
         }
 
         private void Execute(WeaponActionDefinition action)

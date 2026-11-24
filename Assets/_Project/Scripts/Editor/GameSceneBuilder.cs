@@ -1258,7 +1258,7 @@ namespace BattleForYourSoul.EditorTools
         /// with Gamepad control paths are merged by the Input System into one device, so existing
         /// Player/Move, Dash and attack actions work without any touch-specific gameplay code.
         /// </summary>
-        private static GameObject BuildMobileControls(Transform canvas, Font font)
+        private static GameObject BuildMobileControls(Transform canvas, Font font, WeaponController weapon)
         {
             var root = new GameObject("MobileControls", typeof(RectTransform));
             root.transform.SetParent(canvas, false);
@@ -1309,10 +1309,10 @@ namespace BattleForYourSoul.EditorTools
                 "DASH", new Vector2(-200f, 290f), new Vector2(120f, 120f), "<Gamepad>/buttonSouth");
             CreateTouchButton(
                 "PrimaryButton", root.transform, font, circle, new Color32(66, 124, 206, 235),
-                "ATK", new Vector2(-200f, 150f), new Vector2(140f, 140f), "<Gamepad>/buttonWest");
+                "ATK", new Vector2(-200f, 150f), new Vector2(140f, 140f), "<Gamepad>/buttonWest", weapon);
             CreateTouchButton(
                 "SecondaryButton", root.transform, font, circle, new Color32(146, 92, 196, 235),
-                "ALT", new Vector2(-370f, 150f), new Vector2(120f, 120f), "<Gamepad>/buttonNorth");
+                "ALT", new Vector2(-370f, 150f), new Vector2(120f, 120f), "<Gamepad>/buttonNorth", weapon);
 
             root.SetActive(false);
             return root;
@@ -1327,7 +1327,8 @@ namespace BattleForYourSoul.EditorTools
             string label,
             Vector2 anchoredPosition,
             Vector2 size,
-            string controlPath)
+            string controlPath,
+            WeaponController weapon = null)
         {
             Image image = CreateImage(name, parent, color, circle);
             PlaceAtAnchor(image.rectTransform, new Vector2(1f, 0f), anchoredPosition, size);
@@ -1343,6 +1344,16 @@ namespace BattleForYourSoul.EditorTools
             textRect.offsetMax = Vector2.zero;
             text.fontSize = 26;
             text.color = Color.white;
+
+            if (weapon != null)
+            {
+                var cooldown = image.gameObject.AddComponent<AttackButtonCooldown>();
+                SetSerializedReference(cooldown, "weapon", weapon);
+                SetSerializedReference(cooldown, "button", onScreenButton);
+                SetSerializedReference(cooldown, "image", image);
+                SetSerializedReference(cooldown, "label", text);
+            }
+
             return image;
         }
 
@@ -1388,7 +1399,10 @@ namespace BattleForYourSoul.EditorTools
             safeAreaGo.AddComponent<SafeAreaFitter>();
 
             // Authored inactive: MobileControlsVisibility activates it on touch-first platforms.
-            GameObject mobileControls = BuildMobileControls(safeAreaGo.transform, font);
+            GameObject mobileControls = BuildMobileControls(
+                safeAreaGo.transform,
+                font,
+                player.GetComponent<WeaponController>());
 
             // Player health bar, anchored top-left.
             Image barBackground = CreateImage("HealthBar", safeAreaGo.transform, new Color32(18, 16, 26, 220));
