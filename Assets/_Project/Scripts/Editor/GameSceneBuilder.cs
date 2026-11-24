@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -1253,7 +1254,7 @@ namespace BattleForYourSoul.EditorTools
         }
 
         /// <summary>
-        /// Builds a virtual Gamepad from uGUI controls. OnScreenStick and OnScreenButton components
+        /// Builds a virtual Gamepad from uGUI controls. FloatingJoystick and OnScreenButton components
         /// with Gamepad control paths are merged by the Input System into one device, so existing
         /// Player/Move, Dash and attack actions work without any touch-specific gameplay code.
         /// </summary>
@@ -1267,33 +1268,51 @@ namespace BattleForYourSoul.EditorTools
             rootRect.offsetMin = Vector2.zero;
             rootRect.offsetMax = Vector2.zero;
 
-            // Static well behind the moving stick: the stick can travel without losing its origin.
-            Image well = CreateImage("MoveWell", root.transform, new Color32(40, 36, 56, 150));
-            PlaceAtAnchor(well.rectTransform, Vector2.zero, new Vector2(140f, 140f), new Vector2(160f, 160f));
-            well.raycastTarget = false;
+            Sprite circle = EnsureCircleSprite();
 
-            Image stick = CreateImage("MoveStick", root.transform, new Color32(112, 136, 194, 210));
-            PlaceAtAnchor(stick.rectTransform, Vector2.zero, new Vector2(140f, 140f), new Vector2(160f, 160f));
+            // Transparent raycast zone: touching anywhere in the left half spawns the pad there.
+            Image moveZone = CreateImage("MoveZone", root.transform, new Color32(255, 255, 255, 0));
+            RectTransform zoneRect = moveZone.rectTransform;
+            zoneRect.anchorMin = Vector2.zero;
+            zoneRect.anchorMax = new Vector2(0.5f, 1f);
+            zoneRect.offsetMin = Vector2.zero;
+            zoneRect.offsetMax = Vector2.zero;
+            moveZone.raycastTarget = true;
 
-            var onScreenStick = stick.gameObject.AddComponent<OnScreenStick>();
-            SetSerializedString(onScreenStick, "m_ControlPath", "<Gamepad>/leftStick");
-            SetSerializedFloat(onScreenStick, "m_MovementRange", 56f);
-            SetSerializedInt(onScreenStick, "m_Behaviour", (int)OnScreenStick.Behaviour.RelativePositionWithStaticOrigin);
-            SetSerializedBool(onScreenStick, "m_UseIsolatedInputActions", true);
+            // Base and knob are hidden while idle so no fixed control sits near the border.
+            // The larger bright circle behind a darker one reads as a ring, so the pad stays
+            // legible over both light and dark floor tiles.
+            Image pad = CreateImage("MovePad", root.transform, new Color32(120, 196, 255, 150), circle);
+            // Centered anchor: runtime positions are computed in the root canvas' centered local space.
+            PlaceAtAnchor(pad.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(168f, 168f));
+            pad.raycastTarget = false;
+            pad.gameObject.SetActive(false);
 
-            Image knob = CreateImage("Knob", stick.transform, new Color32(224, 232, 248, 240));
-            PlaceAtAnchor(knob.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(72f, 72f));
+            Image padInner = CreateImage("MovePadInner", pad.transform, new Color32(28, 34, 52, 210), circle);
+            PlaceAtAnchor(padInner.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(140f, 140f));
+            padInner.raycastTarget = false;
+
+            Image knob = CreateImage("Knob", pad.transform, new Color32(240, 246, 255, 245), circle);
+            PlaceAtAnchor(knob.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(78f, 78f));
             knob.raycastTarget = false;
 
+            var joystick = moveZone.gameObject.AddComponent<FloatingJoystick>();
+            SetSerializedReference(joystick, "touchZone", zoneRect);
+            SetSerializedReference(joystick, "baseVisual", pad.rectTransform);
+            SetSerializedReference(joystick, "knob", knob.rectTransform);
+            SetSerializedFloat(joystick, "movementRange", 56f);
+            SetSerializedString(joystick, "m_ControlPath", "<Gamepad>/leftStick");
+
+            // Inset from the bottom-right corner leaves room for rounded corners and notches.
             CreateTouchButton(
-                "DashButton", root.transform, font, new Color32(214, 140, 62, 235),
-                "DASH", new Vector2(-96f, 204f), new Vector2(120f, 120f), "<Gamepad>/buttonSouth");
+                "DashButton", root.transform, font, circle, new Color32(214, 140, 62, 235),
+                "DASH", new Vector2(-200f, 290f), new Vector2(120f, 120f), "<Gamepad>/buttonSouth");
             CreateTouchButton(
-                "PrimaryButton", root.transform, font, new Color32(66, 124, 206, 235),
-                "ATK", new Vector2(-96f, 64f), new Vector2(140f, 140f), "<Gamepad>/buttonWest");
+                "PrimaryButton", root.transform, font, circle, new Color32(66, 124, 206, 235),
+                "ATK", new Vector2(-200f, 150f), new Vector2(140f, 140f), "<Gamepad>/buttonWest");
             CreateTouchButton(
-                "SecondaryButton", root.transform, font, new Color32(146, 92, 196, 235),
-                "ALT", new Vector2(-250f, 64f), new Vector2(120f, 120f), "<Gamepad>/buttonNorth");
+                "SecondaryButton", root.transform, font, circle, new Color32(146, 92, 196, 235),
+                "ALT", new Vector2(-370f, 150f), new Vector2(120f, 120f), "<Gamepad>/buttonNorth");
 
             root.SetActive(false);
             return root;
@@ -1303,13 +1322,14 @@ namespace BattleForYourSoul.EditorTools
             string name,
             Transform parent,
             Font font,
+            Sprite circle,
             Color32 color,
             string label,
             Vector2 anchoredPosition,
             Vector2 size,
             string controlPath)
         {
-            Image image = CreateImage(name, parent, color);
+            Image image = CreateImage(name, parent, color, circle);
             PlaceAtAnchor(image.rectTransform, new Vector2(1f, 0f), anchoredPosition, size);
 
             var onScreenButton = image.gameObject.AddComponent<OnScreenButton>();
@@ -1608,13 +1628,64 @@ namespace BattleForYourSoul.EditorTools
             return view;
         }
 
-        private static Image CreateImage(string name, Transform parent, Color32 color)
+        private const string CircleSpritePath = "Assets/_Project/Art/UI/Circle.png";
+
+        /// <summary>
+        /// Generates (once) a white, antialiased circle used by the round touch controls. Keeping it
+        /// white lets the Image color tint it, so every button shares one sprite.
+        /// </summary>
+        private static Sprite EnsureCircleSprite()
+        {
+            Sprite existing = AssetDatabase.LoadAssetAtPath<Sprite>(CircleSpritePath);
+            if (existing != null)
+                return existing;
+
+            const int size = 128;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var pixels = new Color32[size * size];
+            const float center = (size - 1) * 0.5f;
+            const float radius = size * 0.5f - 1f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float distance = Vector2.Distance(new Vector2(x, y), new Vector2(center, center));
+                    float alpha = Mathf.Clamp01(radius - distance + 0.5f);
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)(alpha * 255f));
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply();
+
+            string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
+            string absolutePath = Path.Combine(projectRoot, CircleSpritePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(absolutePath)!);
+            File.WriteAllBytes(absolutePath, texture.EncodeToPNG());
+            Object.DestroyImmediate(texture);
+
+            AssetDatabase.ImportAsset(CircleSpritePath, ImportAssetOptions.ForceUpdate);
+            var importer = (TextureImporter)AssetImporter.GetAtPath(CircleSpritePath);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.spritePixelsPerUnit = 100f;
+            importer.filterMode = FilterMode.Bilinear;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.mipmapEnabled = false;
+            importer.alphaIsTransparency = true;
+            importer.SaveAndReimport();
+
+            return AssetDatabase.LoadAssetAtPath<Sprite>(CircleSpritePath);
+        }
+
+        private static Image CreateImage(string name, Transform parent, Color32 color, Sprite sprite = null)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Image));
             go.transform.SetParent(parent, false);
 
             var image = go.GetComponent<Image>();
             image.color = color;
+            image.sprite = sprite;
             return image;
         }
 
