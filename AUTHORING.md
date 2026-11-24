@@ -223,6 +223,28 @@ software implementation in the Android emulator cannot render URP geometry (the 
 camera-clear colour even though the player runs). Do not re-enable Vulkan in Player Settings unless
 the target device has been verified.
 
+## iOS build
+
+The project is configured for iOS with application id `com.setzener.battleforyoursoul`, landscape
+orientation and a minimum OS version of 15.0. iOS Build Support for the project's Unity version and
+Xcode are required. A build with the checked-in iOS profile produces an Xcode project:
+
+```sh
+unity build --profile iOS --output Builds/iOS/BattleForYourSoul
+```
+
+The profile is at `Assets/Settings/Build Profiles/iOS.asset` and uses the project's global scene
+list. The generated `Unity-iPhone.xcodeproj` has no `DEVELOPMENT_TEAM`, so a device build fails until
+a team is selected in Xcode under **Unity-iPhone ▸ Signing & Capabilities** (Automatic signing then
+creates the provisioning profile). Because each Unity build regenerates the Xcode project, the team
+must be selected again after every rebuild. Release signing and App Store credentials are deliberately
+not committed.
+
+For a Simulator run, set `PlayerSettings.iOS.sdkVersion` to `iOSSdkVersion.SimulatorSDK` before the
+Unity build, compile the generated project with `-sdk iphonesimulator CODE_SIGNING_ALLOWED=NO`, then
+install the resulting `.app` with `xcrun simctl install`. Restore `iOSSdkVersion.DeviceSDK` afterwards
+so device builds keep using the device SDK.
+
 ## Adding a new definition type
 
 Definition assets are plain `ScriptableObject`s with `[CreateAssetMenu]`. Runtime state stays on the
