@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &658577983391219627
+--- !u!1 &8029972220607791592
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,9 +8,9 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 3930877399511107361}
-  - component: {fileID: 1812286963535572364}
-  - component: {fileID: 7533175430019540123}
+  - component: {fileID: 5381375761518537550}
+  - component: {fileID: 2495814743562204596}
+  - component: {fileID: 1641552582890049837}
   m_Layer: 0
   m_Name: Visual
   m_TagString: Untagged
@@ -18,29 +18,29 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &3930877399511107361
+--- !u!4 &5381375761518537550
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 658577983391219627}
+  m_GameObject: {fileID: 8029972220607791592}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 7540413826372311857}
+  m_Father: {fileID: 5154688510427004270}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!212 &1812286963535572364
+--- !u!212 &2495814743562204596
 SpriteRenderer:
   serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 658577983391219627}
+  m_GameObject: {fileID: 8029972220607791592}
   m_Enabled: 1
   m_CastShadows: 0
   m_ReceiveShadows: 0
@@ -93,22 +93,22 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
   m_BlendShapeWeights: []
---- !u!114 &7533175430019540123
+--- !u!114 &1641552582890049837
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 658577983391219627}
+  m_GameObject: {fileID: 8029972220607791592}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 01daabdb9b63742b083246b8abbb4f5c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: BattleForYourSoul::BattleForYourSoul.World.IsometricSpriteSorter
-  targetRenderer: {fileID: 1812286963535572364}
+  targetRenderer: {fileID: 2495814743562204596}
   unitsPerOrderStep: 100
   orderOffset: 0
---- !u!1 &8335476370733512544
+--- !u!1 &9186998572982298986
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -116,12 +116,12 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 7540413826372311857}
-  - component: {fileID: 257574264608207304}
-  - component: {fileID: 2186904448837478123}
-  - component: {fileID: 8473158956733236518}
-  - component: {fileID: 8691309523161747632}
-  - component: {fileID: 4177507981118994252}
+  - component: {fileID: 5154688510427004270}
+  - component: {fileID: 4470482233174885237}
+  - component: {fileID: 4980178328524128909}
+  - component: {fileID: 5845197042602176704}
+  - component: {fileID: 1938826640360088244}
+  - component: {fileID: 4105864325695431542}
   m_Layer: 9
   m_Name: Enemy
   m_TagString: Untagged
@@ -129,30 +129,30 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &7540413826372311857
+--- !u!4 &5154688510427004270
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8335476370733512544}
+  m_GameObject: {fileID: 9186998572982298986}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 3930877399511107361}
+  - {fileID: 5381375761518537550}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!50 &257574264608207304
+--- !u!50 &4470482233174885237
 Rigidbody2D:
   serializedVersion: 5
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8335476370733512544}
+  m_GameObject: {fileID: 9186998572982298986}
   m_BodyType: 0
   m_Simulated: 1
   m_UseFullKinematicContacts: 0
@@ -172,13 +172,13 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 4
---- !u!58 &2186904448837478123
+--- !u!58 &4980178328524128909
 CircleCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8335476370733512544}
+  m_GameObject: {fileID: 9186998572982298986}
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
@@ -208,26 +208,26 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
   m_Radius: 0.28
---- !u!114 &8473158956733236518
+--- !u!114 &5845197042602176704
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8335476370733512544}
+  m_GameObject: {fileID: 9186998572982298986}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 10771f4ad71db4faeb25686f00381c52, type: 3}
   m_Name: 
   m_EditorClassIdentifier: BattleForYourSoul::BattleForYourSoul.Combat.Health
   maxHealth: 10
---- !u!114 &8691309523161747632
+--- !u!114 &1938826640360088244
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8335476370733512544}
+  m_GameObject: {fileID: 9186998572982298986}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 509fa2402c1b64226a18f99b2ad80b66, type: 3}
@@ -238,19 +238,19 @@ MonoBehaviour:
     m_Bits: 0
   damage: 5
   interval: 0.5
---- !u!114 &4177507981118994252
+--- !u!114 &4105864325695431542
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8335476370733512544}
+  m_GameObject: {fileID: 9186998572982298986}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 30c6495a8d4bf4365b591e4d97b2b398, type: 3}
   m_Name: 
   m_EditorClassIdentifier: BattleForYourSoul::BattleForYourSoul.Enemies.Enemy
-  health: {fileID: 8473158956733236518}
-  contactDamage: {fileID: 8691309523161747632}
-  spriteRenderer: {fileID: 1812286963535572364}
-  bodyCollider: {fileID: 2186904448837478123}
+  health: {fileID: 5845197042602176704}
+  contactDamage: {fileID: 1938826640360088244}
+  spriteRenderer: {fileID: 2495814743562204596}
+  bodyCollider: {fileID: 4980178328524128909}
