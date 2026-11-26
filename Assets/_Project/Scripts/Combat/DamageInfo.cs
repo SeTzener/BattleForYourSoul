@@ -4,16 +4,24 @@ namespace BattleForYourSoul.Combat
 {
     /// <summary>
     /// Immutable description of a single hit. Passed by readonly reference so combat can carry
-    /// more context (knockback direction, damage source) later without allocating per hit.
+    /// status effects, critical information and damage source without allocating per hit.
     /// </summary>
     public readonly struct DamageInfo
     {
-        public DamageInfo(float amount, Vector2 sourcePosition, Vector2 direction, GameObject source = null)
+        public DamageInfo(
+            float amount,
+            Vector2 sourcePosition,
+            Vector2 direction,
+            GameObject source = null,
+            HitEffects effects = default,
+            bool critical = false)
         {
             Amount = amount;
             SourcePosition = sourcePosition;
             Direction = direction;
             Source = source;
+            Effects = effects;
+            Critical = critical;
         }
 
         /// <summary>Hit points to remove.</summary>
@@ -27,5 +35,15 @@ namespace BattleForYourSoul.Combat
 
         /// <summary>The GameObject that caused the hit, if known.</summary>
         public GameObject Source { get; }
+
+        /// <summary>Root, stun and knockback payload for this hit.</summary>
+        public HitEffects Effects { get; }
+
+        /// <summary>True when this hit rolled a critical.</summary>
+        public bool Critical { get; }
+
+        /// <summary>Copy with a different amount (used by defense and guard-break processing).</summary>
+        public DamageInfo WithAmount(float amount) =>
+            new DamageInfo(amount, SourcePosition, Direction, Source, Effects, Critical);
     }
 }

@@ -33,6 +33,7 @@ namespace BattleForYourSoul.EditorTools
             EnsureFolder("Assets/_Project/Art/VFX");
             EnsureFolder("Assets/_Project/Art/UI");
             EnsureFolder("Assets/_Project/Art/Items");
+            EnsureFolder("Assets/_Project/Art/Animation");
 
             GenerateFloorTiles();
             GeneratePlayer();
@@ -41,8 +42,9 @@ namespace BattleForYourSoul.EditorTools
             GenerateProjectileBolt();
             GenerateUpgradeIcon();
             GenerateDoors();
-            GenerateWeapons();
+            GenerateSuperpowers();
             GenerateAttackVfx();
+            GenerateAnimations();
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -369,7 +371,7 @@ namespace BattleForYourSoul.EditorTools
             }
         }
 
-        private static void GenerateWeapons()
+        private static void GenerateSuperpowers()
         {
             var steel = new Color32(206, 216, 230, 255);
             var steelDark = new Color32(140, 154, 178, 255);
@@ -385,7 +387,7 @@ namespace BattleForYourSoul.EditorTools
             FillRect(sword, 16, 16, 4, 5, 8, 1, gold);
             FillRect(sword, 16, 16, 7, 2, 2, 3, wood);
             FillRect(sword, 16, 16, 6, 1, 4, 1, gold);
-            WriteSprite("Assets/_Project/Art/Items/Weapon_Sword.png", sword, 16, 16, SpriteAlignment.BottomCenter);
+            WriteSprite("Assets/_Project/Art/Items/Superpower_Sword.png", sword, 16, 16, SpriteAlignment.BottomCenter);
 
             var spear = new Color32[16 * 16];
             FillRect(spear, 16, 16, 7, 1, 2, 10, wood);
@@ -394,7 +396,7 @@ namespace BattleForYourSoul.EditorTools
             spear[15 * 16 + 8] = steel;
             FillRect(spear, 16, 16, 5, 11, 2, 1, steelDark);
             FillRect(spear, 16, 16, 9, 11, 2, 1, steelDark);
-            WriteSprite("Assets/_Project/Art/Items/Weapon_Spear.png", spear, 16, 16, SpriteAlignment.BottomCenter);
+            WriteSprite("Assets/_Project/Art/Items/Superpower_Spear.png", spear, 16, 16, SpriteAlignment.BottomCenter);
 
             var bow = new Color32[16 * 16];
             FillRect(bow, 16, 16, 4, 2, 1, 12, stringColor);
@@ -403,7 +405,7 @@ namespace BattleForYourSoul.EditorTools
             FillRect(bow, 16, 16, 9, 8, 1, 3, wood);
             FillRect(bow, 16, 16, 8, 11, 2, 2, wood);
             FillRect(bow, 16, 16, 6, 13, 2, 1, wood);
-            WriteSprite("Assets/_Project/Art/Items/Weapon_Bow.png", bow, 16, 16, SpriteAlignment.BottomCenter);
+            WriteSprite("Assets/_Project/Art/Items/Superpower_Bow.png", bow, 16, 16, SpriteAlignment.BottomCenter);
 
             var arrow = new Color32[8 * 8];
             FillRect(arrow, 8, 8, 1, 3, 5, 2, wood);
@@ -411,6 +413,17 @@ namespace BattleForYourSoul.EditorTools
             FillRect(arrow, 8, 8, 0, 2, 1, 2, gold);
             FillRect(arrow, 8, 8, 0, 5, 1, 2, gold);
             WriteSprite("Assets/_Project/Art/VFX/Projectile_Arrow.png", arrow, 8, 8, SpriteAlignment.Center);
+
+            // Superstrength: a simple wrapped fist.
+            var fist = new Color32[16 * 16];
+            var skin = new Color32(240, 196, 150, 255);
+            var skinShade = new Color32(206, 154, 112, 255);
+            var wrap = new Color32(196, 88, 76, 255);
+            FillEllipse(fist, 16, 16, 8, 8, 6, 5, skin);
+            FillRect(fist, 16, 16, 3, 5, 10, 2, wrap);
+            FillRect(fist, 16, 16, 4, 8, 8, 1, skinShade);
+            FillRect(fist, 16, 16, 5, 12, 6, 2, wrap);
+            WriteSprite("Assets/_Project/Art/Items/Superpower_Fists.png", fist, 16, 16, SpriteAlignment.BottomCenter);
         }
 
         /// <summary>
@@ -457,6 +470,151 @@ namespace BattleForYourSoul.EditorTools
             }
 
             WriteSprite("Assets/_Project/Art/VFX/VFX_Thrust.png", thrust, w, h, SpriteAlignment.Center);
+        }
+
+        // -------------------------------------------------------------------------------------
+        // Animation placeholders
+        //
+        // Every frame is a 16x24 silhouette with the same pivot as the resting player sprite, so
+        // SuperpowerPosePlayer can swap frames without changing the collider or the ground position.
+        // These are deliberately crude: they exist so timing, lunge and hop can be tuned before real
+        // sprite sheets arrive.
+        // -------------------------------------------------------------------------------------
+
+        private struct Pose
+        {
+            public int LeadReach;
+            public int LeadRise;
+            public int TrailReach;
+            public int TrailRise;
+            public int BodyY;
+            public bool Crouch;
+            public Color32 Accent;
+        }
+
+        /// <summary>Generates every attack frame referenced by GameSceneBuilder's action seeds.</summary>
+        private static void GenerateAnimations()
+        {
+            var skin = new Color32(240, 196, 150, 255);
+            var shirt = new Color32(70, 116, 206, 255);
+            var pants = new Color32(58, 58, 78, 255);
+            var boot = new Color32(40, 34, 30, 255);
+            var fist = new Color32(214, 92, 80, 255);
+            var steel = new Color32(206, 216, 230, 255);
+            var gold = new Color32(248, 214, 124, 255);
+            var stone = new Color32(150, 140, 166, 255);
+
+            void Frames(string name, params Pose[] poses)
+            {
+                for (int i = 0; i < poses.Length; i++)
+                {
+                    WritePose($"Assets/_Project/Art/Animation/Anim_{name}_{i}.png", poses[i], skin, shirt, pants, boot);
+                }
+            }
+
+            // Superstrength. The "jump" is only the sprite moving upward; there is no physics hop.
+            Frames("Punch",
+                new Pose { LeadReach = 1, LeadRise = 0, Accent = fist },
+                new Pose { LeadReach = 4, LeadRise = 1, Accent = fist },
+                new Pose { LeadReach = 6, LeadRise = 1, Accent = fist });
+            Frames("Uppercut",
+                new Pose { LeadReach = 1, LeadRise = -2, BodyY = -1, Accent = fist },
+                new Pose { LeadReach = 2, LeadRise = 3, BodyY = 1, Accent = fist },
+                new Pose { LeadReach = 3, LeadRise = 6, BodyY = 2, Accent = fist },
+                new Pose { LeadReach = 2, LeadRise = 4, BodyY = 1, Accent = fist });
+            Frames("NorthernStar",
+                new Pose { LeadReach = 5, LeadRise = 1, Accent = fist },
+                new Pose { TrailReach = 5, TrailRise = 1, Accent = fist },
+                new Pose { LeadReach = 5, TrailReach = 3, LeadRise = 2, Accent = gold },
+                new Pose { TrailReach = 5, TrailRise = 1, Accent = fist },
+                new Pose { LeadReach = 5, LeadRise = 1, Accent = fist },
+                new Pose { LeadReach = 6, TrailReach = 4, LeadRise = 2, Accent = gold });
+            Frames("BodySlam",
+                new Pose { BodyY = 5, LeadRise = 5, TrailRise = 5, Accent = fist },
+                new Pose { BodyY = 8, LeadRise = 6, TrailRise = 6, Accent = fist },
+                new Pose { BodyY = 3, LeadReach = 2, TrailReach = 2, Accent = fist },
+                new Pose { BodyY = -1, LeadReach = 4, TrailReach = 4, Crouch = true, Accent = stone },
+                new Pose { BodyY = -2, LeadReach = 5, TrailReach = 5, Crouch = true, Accent = stone });
+            Frames("Charge",
+                new Pose { LeadReach = 2, LeadRise = 1, TrailReach = 2, Accent = fist },
+                new Pose { LeadReach = 4, LeadRise = 1, TrailReach = 2, Accent = fist },
+                new Pose { LeadReach = 6, LeadRise = 1, TrailReach = 1, Accent = fist });
+
+            // Existing superpowers get matching placeholders so every attack has an authored pose.
+            Frames("Sword_Slash",
+                new Pose { LeadReach = 2, LeadRise = 2, Accent = steel },
+                new Pose { LeadReach = 5, LeadRise = 3, Accent = steel });
+            Frames("Sword_Cleave",
+                new Pose { LeadReach = 3, LeadRise = 5, TrailReach = 2, TrailRise = 3, Accent = steel },
+                new Pose { LeadReach = 5, LeadRise = 2, TrailReach = 4, TrailRise = 4, Accent = steel },
+                new Pose { LeadReach = 6, LeadRise = -1, TrailReach = 5, TrailRise = 1, Accent = gold });
+            Frames("Spear_Thrust",
+                new Pose { LeadReach = 4, LeadRise = 1, Accent = steel },
+                new Pose { LeadReach = 7, LeadRise = 1, Accent = steel });
+            Frames("Spear_Sweep",
+                new Pose { LeadReach = 4, LeadRise = 0, Accent = steel },
+                new Pose { LeadReach = 6, LeadRise = 2, TrailReach = 3, Accent = steel },
+                new Pose { LeadReach = 5, LeadRise = -2, TrailReach = 5, Accent = gold });
+            Frames("Bow_Shot",
+                new Pose { LeadReach = 3, LeadRise = 2, TrailReach = 3, TrailRise = 2, Accent = gold },
+                new Pose { LeadReach = 4, LeadRise = 2, TrailReach = 4, TrailRise = 2, Accent = gold });
+            Frames("Bow_Spread",
+                new Pose { LeadReach = 2, LeadRise = 3, TrailReach = 3, TrailRise = 1, Accent = gold },
+                new Pose { LeadReach = 4, LeadRise = 4, TrailReach = 4, TrailRise = 2, Accent = gold },
+                new Pose { LeadReach = 3, LeadRise = 5, TrailReach = 5, TrailRise = 3, Accent = gold });
+        }
+
+        private static void WritePose(string path, Pose pose, Color32 skin, Color32 shirt, Color32 pants, Color32 boot)
+        {
+            const int w = 16;
+            const int h = 24;
+            var px = new Color32[w * h];
+            for (int i = 0; i < px.Length; i++)
+            {
+                px[i] = Clear;
+            }
+
+            int body = pose.BodyY;
+            int legHeight = pose.Crouch ? 4 : 7;
+            FillRect(px, w, h, 5, 0, 3, legHeight, pants);
+            FillRect(px, w, h, 9, 0, 3, legHeight, pants);
+            FillRect(px, w, h, 5, 0, 3, 2, boot);
+            FillRect(px, w, h, 9, 0, 3, 2, boot);
+
+            int torsoY = legHeight + body;
+            FillRect(px, w, h, 5, torsoY, 7, 9, shirt);
+
+            int headY = torsoY + 10;
+            FillEllipse(px, w, h, 8, headY, 4, 4, skin);
+            FillEllipse(px, w, h, 8, headY + 2, 4, 2, new Color32(90, 58, 42, 255));
+
+            int shoulderY = torsoY + 6;
+            DrawArm(px, w, h, 11, shoulderY, 11 + pose.LeadReach, shoulderY + pose.LeadRise, shirt, 2);
+            DrawArm(px, w, h, 5, shoulderY, 5 - pose.TrailReach, shoulderY + pose.TrailRise, shirt, 2);
+
+            if (pose.LeadReach > 0 || pose.LeadRise != 0 || pose.Accent.r > 200)
+            {
+                FillEllipse(px, w, h, 11 + pose.LeadReach, shoulderY + pose.LeadRise, 2, 2, pose.Accent);
+            }
+
+            if (pose.TrailReach > 0)
+            {
+                FillEllipse(px, w, h, 5 - pose.TrailReach, shoulderY + pose.TrailRise, 2, 2, pose.Accent);
+            }
+
+            WriteSprite(path, px, w, h, SpriteAlignment.BottomCenter);
+        }
+
+        private static void DrawArm(Color32[] px, int w, int h, int x0, int y0, int x1, int y1, Color32 color, int thickness)
+        {
+            int steps = Mathf.Max(Mathf.Abs(x1 - x0), Mathf.Abs(y1 - y0), 1);
+            for (int i = 0; i <= steps; i++)
+            {
+                float t = i / (float)steps;
+                int x = Mathf.RoundToInt(Mathf.Lerp(x0, x1, t));
+                int y = Mathf.RoundToInt(Mathf.Lerp(y0, y1, t));
+                FillRect(px, w, h, x - thickness / 2, y - thickness / 2, thickness, thickness, color);
+            }
         }
 
         /// <summary>Fills an arc centred on +X, tapering toward its ends for a crescent silhouette.</summary>

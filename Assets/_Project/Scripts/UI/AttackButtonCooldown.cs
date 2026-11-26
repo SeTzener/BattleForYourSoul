@@ -1,12 +1,12 @@
 using UnityEngine;
 using UnityEngine.InputSystem.OnScreen;
 using UnityEngine.UI;
-using BattleForYourSoul.Combat;
+using BattleForYourSoul.Superpowers;
 
 namespace BattleForYourSoul.UI
 {
     /// <summary>
-    /// Disables an on-screen attack button while the weapon's shared attack cooldown is active.
+    /// Disables an on-screen attack button while the superpower's shared attack cooldown is active.
     /// Both attack buttons carry this component, so using either attack blocks both until the
     /// cooldown ends. The button is also dimmed to show that the input is unavailable.
     /// </summary>
@@ -14,7 +14,7 @@ namespace BattleForYourSoul.UI
     [RequireComponent(typeof(Image))]
     public sealed class AttackButtonCooldown : MonoBehaviour
     {
-        [SerializeField] private WeaponController weapon;
+        [SerializeField] private SuperpowerController superpower;
         [SerializeField] private OnScreenButton button;
         [SerializeField] private Image image;
         [SerializeField] private Graphic label;
@@ -42,12 +42,12 @@ namespace BattleForYourSoul.UI
 
         private void Update()
         {
-            if (weapon == null)
+            if (superpower == null)
             {
                 return;
             }
 
-            bool blocked = weapon.IsAttackOnCooldown;
+            bool blocked = superpower.IsAttackOnCooldown;
             if (blocked == _lastBlocked)
             {
                 return;

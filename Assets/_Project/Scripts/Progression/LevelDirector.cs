@@ -6,7 +6,7 @@ using BattleForYourSoul.Core;
 using BattleForYourSoul.Enemies;
 using BattleForYourSoul.Player;
 using BattleForYourSoul.UI;
-using BattleForYourSoul.Weapons;
+using BattleForYourSoul.Superpowers;
 using BattleForYourSoul.World;
 
 namespace BattleForYourSoul.Progression
@@ -31,7 +31,10 @@ namespace BattleForYourSoul.Progression
         [SerializeField] private PlayerMovement playerMovement;
         [SerializeField] private CameraFollow cameraFollow;
         [SerializeField] private LevelUpController levelUpController;
-        [SerializeField] private WeaponSelection weaponSelection;
+        [SerializeField] private Experience experience;
+        [SerializeField] private SuperpowerSelection superpowerSelection;
+        [SerializeField] private RunUpgradeState runUpgrades;
+        [SerializeField] private PlayerStats playerStats;
         [SerializeField] private StageDoor[] doors;
 
         private int _stageIndex;
@@ -59,8 +62,8 @@ namespace BattleForYourSoul.Progression
         /// <summary>Category whose filtered choice is queued when this stage is cleared.</summary>
         public UpgradeCategoryDefinition PendingRewardCategory => _pendingCategory;
 
-        /// <summary>Whether the current room is Samsara, the weapon-selection room.</summary>
-        public bool IsWeaponSelectionStage => CurrentStage != null && CurrentStage.IsWeaponSelectionStage;
+        /// <summary>Whether the current room is Samsara, the superpower-selection room.</summary>
+        public bool IsSuperpowerSelectionStage => CurrentStage != null && CurrentStage.IsSuperpowerSelectionStage;
 
         /// <summary>Raised with the new stage number whenever the run advances.</summary>
         public event Action<int> LevelChanged;
@@ -82,9 +85,9 @@ namespace BattleForYourSoul.Progression
                 spawner.Cleared += HandleCleared;
             }
 
-            if (weaponSelection != null)
+            if (superpowerSelection != null)
             {
-                weaponSelection.SelectionChanged += HandleWeaponSelected;
+                superpowerSelection.SelectionChanged += HandleSuperpowerSelected;
             }
         }
 
@@ -96,9 +99,9 @@ namespace BattleForYourSoul.Progression
                 spawner.Cleared -= HandleCleared;
             }
 
-            if (weaponSelection != null)
+            if (superpowerSelection != null)
             {
-                weaponSelection.SelectionChanged -= HandleWeaponSelected;
+                superpowerSelection.SelectionChanged -= HandleSuperpowerSelected;
             }
         }
 
@@ -118,7 +121,7 @@ namespace BattleForYourSoul.Progression
 
         /// <summary>
         /// Called by a door trigger once the room is clear. In Samsara the exit also commits the
-        /// weapon choice for the rest of the run, and stays locked until one has been equipped.
+        /// superpower choice for the rest of the run, and stays locked until one has been equipped.
         /// </summary>
         public void SelectExit(StageDoor door)
         {
@@ -127,15 +130,15 @@ namespace BattleForYourSoul.Progression
                 return;
             }
 
-            bool lockingWeapon = IsWeaponSelectionStage && weaponSelection != null;
-            if (lockingWeapon && weaponSelection.SelectedWeapon == null)
+            bool lockingSuperpower = IsSuperpowerSelectionStage && superpowerSelection != null;
+            if (lockingSuperpower && superpowerSelection.SelectedSuperpower == null)
             {
                 return;
             }
 
-            if (lockingWeapon)
+            if (lockingSuperpower)
             {
-                weaponSelection.Lock();
+                superpowerSelection.Lock();
             }
 
             _pendingCategory = door.Category;
@@ -155,11 +158,31 @@ namespace BattleForYourSoul.Progression
         private void ApplyStage()
         {
             _cleared = false;
+
+            // Samsara initialises a fresh run with base stats, base health/XP, an empty upgrade record
+            // and no queued reward. It is only the opening stage, but keeping this reset here makes a
+            // designer-authored return to the selection room deterministic too. Clear the selection
+            // first so PlayerStats sees a null definition for every subsequent Push.
+            if (IsSuperpowerSelectionStage)
+            {
+                if (_pendingCategory != null)
+                {
+                    _pendingCategory = null;
+                    PendingCategoryChanged?.Invoke(null);
+                }
+
+                levelUpController?.ResetForNewRun();
+                experience?.ResetForNewRun();
+                superpowerSelection?.Reset();
+                runUpgrades?.Clear();
+                playerStats?.ResetUpgrades();
+            }
+
             ApplyDoorAvailability();
             SetDoorsUnlocked(false);
-            if (weaponSelection != null)
+            if (superpowerSelection != null)
             {
-                weaponSelection.SetPickupsVisible(IsWeaponSelectionStage);
+                superpowerSelection.SetPickupsVisible(IsSuperpowerSelectionStage);
             }
 
             ClearedChanged?.Invoke(false);
@@ -192,13 +215,13 @@ namespace BattleForYourSoul.Progression
             UpdateDoorUnlocks();
             ClearedChanged?.Invoke(true);
 
-            if (_pendingCategory != null && levelUpController != null)
+            if (!IsSuperpowerSelectionStage && _pendingCategory != null && levelUpController != null)
             {
                 levelUpController.QueueCategoryReward(_pendingCategory);
             }
         }
 
-        private void HandleWeaponSelected(WeaponDefinition _)
+        private void HandleSuperpowerSelected(SuperpowerDefinition _)
         {
             if (_cleared)
             {
@@ -208,12 +231,12 @@ namespace BattleForYourSoul.Progression
 
         /// <summary>
         /// An empty Samsara room is clear immediately, but its exit only opens once the player has
-        /// equipped a weapon. Every other room opens its enabled exits as soon as it is cleared.
+        /// equipped a superpower. Every other room opens its enabled exits as soon as it is cleared.
         /// </summary>
         private void UpdateDoorUnlocks()
         {
-            bool hasWeapon = weaponSelection == null || weaponSelection.SelectedWeapon != null;
-            SetDoorsUnlocked(_cleared && (!IsWeaponSelectionStage || hasWeapon));
+            bool hasSuperpower = superpowerSelection == null || superpowerSelection.SelectedSuperpower != null;
+            SetDoorsUnlocked(_cleared && (!IsSuperpowerSelectionStage || hasSuperpower));
         }
 
         private void ApplyDoorAvailability()

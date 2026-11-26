@@ -22,6 +22,15 @@ MonoBehaviour:
   dashDuration: 0.18
   dashCooldown: 1.2
   dashGrace: 0.08
+  dashAnimation:
+    Frames:
+    - {fileID: 21300000, guid: e9297a712365b4dcdb08c529f624d194, type: 3}
+    - {fileID: 21300000, guid: 4f48a345181fb4bdba604e86aae16126, type: 3}
+    - {fileID: 21300000, guid: 36d7af53dae4a49a29dd6ea0e63bc278, type: 3}
+    FrameDuration: 0.06
+    HopOffset: {x: 0.1, y: 0.02}
+    LungeDistance: 0
+    LungeDuration: 0
   colliderSize: {x: 0.45, y: 0.5}
   colliderOffset: {x: 0, y: 0.25}
-  startingWeapon: {fileID: 11400000, guid: ea83a96353cd94e06818f84f6a969a94, type: 2}
+  startingSuperpower: {fileID: 11400000, guid: ea83a96353cd94e06818f84f6a969a94, type: 2}

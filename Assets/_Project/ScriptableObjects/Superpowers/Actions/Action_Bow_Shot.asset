@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c338bda2c5d53490b847177192b26d14, type: 3}
+  m_Name: Action_Bow_Shot
+  m_EditorClassIdentifier: BattleForYourSoul::BattleForYourSoul.Superpowers.SuperpowerActionDefinition
+  displayName: Shot
+  shape: 2
+  cooldown: 0.34
+  damage: 1
+  range: 8
+  arcDegrees: 360
+  lineWidth: 0.4
+  hitCount: 1
+  hitDelay: 0
+  hitInterval: 0
+  onHit:
+    RootDuration: 0
+    RootAffectsSpecialFoes: 0
+    StunDuration: 0
+    KnockbackForce: 0
+    KnockbackDuration: 0
+    KnockbackAffectsSpecialFoes: 0
+    GuardBreak: 0
+  animation:
+    Frames:
+    - {fileID: 21300000, guid: 037c6723b3057402ba491bacbe9e698e, type: 3}
+    - {fileID: 21300000, guid: d4246b9d151234586820876ada55f36e, type: 3}
+    FrameDuration: 0.16
+    HopOffset: {x: 0, y: 0}
+    LungeDistance: 0
+    LungeDuration: 0
+  projectilesPerShot: 1
+  spreadDegrees: 0
+  projectileSpeed: 15
+  projectileLifetime: 1.1
+  projectileSprite: {fileID: 21300000, guid: f0e22bfac27a94598ba426c8c97df50f, type: 3}
+  hitVfxSprite: {fileID: 0}
+  hitVfxColor: {r: 0, g: 0, b: 0, a: 0}
+  hitVfxSize: 0
+  hitVfxDuration: 0
+  hitVfxSweep: 0

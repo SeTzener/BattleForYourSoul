@@ -9,7 +9,8 @@ namespace BattleForYourSoul.Player
     /// only; it never touches the sprite or the camera.
     ///
     /// Input is read in <c>Update</c> and applied in <c>FixedUpdate</c> so physics stays in step
-    /// with the fixed timestep.
+    /// with the fixed timestep. Dashes and attack steps temporarily own the body; this component
+    /// simply gets out of their way instead of blending its velocity with theirs.
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D))]
     public sealed class PlayerMovement : MonoBehaviour
@@ -30,6 +31,7 @@ namespace BattleForYourSoul.Player
 
         private Rigidbody2D _body;
         private IPlayerInput _input;
+        private AttackMovement _attackMove;
         private Vector2 _desiredVelocity;
         private float _speedMultiplier = 1f;
         private Vector2 _dashVelocity;
@@ -58,7 +60,8 @@ namespace BattleForYourSoul.Player
 
         /// <summary>
         /// Moves the player to a stage entrance and clears any motion left over from the previous
-        /// room, so walking through a door never carries momentum into the next stage.
+        /// room, so walking through a door never carries momentum or an unfinished attack step into
+        /// the next stage.
         /// </summary>
         public void TeleportTo(Vector2 position)
         {
@@ -66,6 +69,13 @@ namespace BattleForYourSoul.Player
             {
                 _body = GetComponent<Rigidbody2D>();
             }
+
+            if (_attackMove == null)
+            {
+                _attackMove = GetComponent<AttackMovement>();
+            }
+
+            _attackMove?.Cancel();
 
             if (_body != null)
             {
@@ -114,6 +124,7 @@ namespace BattleForYourSoul.Player
         {
             _body = GetComponent<Rigidbody2D>();
             _input = GetComponent<IPlayerInput>();
+            _attackMove = GetComponent<AttackMovement>();
 
             if (definition != null)
             {
@@ -151,6 +162,12 @@ namespace BattleForYourSoul.Player
                     _body.linearVelocity = _dashVelocity;
                 }
 
+                return;
+            }
+
+            // AttackMovement drives position itself. Do not fight it with input velocity.
+            if (_attackMove != null && _attackMove.IsActive)
+            {
                 return;
             }
 

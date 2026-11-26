@@ -15,5 +15,5 @@ MonoBehaviour:
   displayName: Samsara
   monsterLevel: 1
   enemyPlacements: []
-  weaponSelectionStage: 1
-  activeDoorIndices: 01000000i
+  superpowerSelectionStage: 1
+  activeDoorIndices: 

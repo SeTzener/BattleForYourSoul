@@ -3,7 +3,7 @@ using UnityEngine.UI;
 using BattleForYourSoul.Combat;
 using BattleForYourSoul.Enemies;
 using BattleForYourSoul.Progression;
-using BattleForYourSoul.Weapons;
+using BattleForYourSoul.Superpowers;
 
 namespace BattleForYourSoul.UI
 {
@@ -26,8 +26,8 @@ namespace BattleForYourSoul.UI
         [SerializeField] private LevelDirector levelDirector;
         [SerializeField] private Text stageLabel;
         [SerializeField] private Text objectiveLabel;
-        [SerializeField] private Text weaponLabel;
-        [SerializeField] private WeaponSelection weaponSelection;
+        [SerializeField] private Text superpowerLabel;
+        [SerializeField] private SuperpowerSelection superpowerSelection;
 
         [Header("Damage ghost")]
         [Tooltip("Seconds the ghost holds the old value after damage before it starts shrinking.")]
@@ -71,11 +71,11 @@ namespace BattleForYourSoul.UI
                 HandleObjectiveChanged();
             }
 
-            if (weaponSelection != null)
+            if (superpowerSelection != null)
             {
-                weaponSelection.SelectionChanged += HandleWeaponChanged;
-                weaponSelection.WeaponLocked += HandleWeaponChanged;
-                HandleWeaponChanged(weaponSelection.SelectedWeapon);
+                superpowerSelection.SelectionChanged += HandleSuperpowerChanged;
+                superpowerSelection.SuperpowerLocked += HandleSuperpowerChanged;
+                HandleSuperpowerChanged(superpowerSelection.SelectedSuperpower);
             }
         }
 
@@ -104,10 +104,10 @@ namespace BattleForYourSoul.UI
                 levelDirector.PendingCategoryChanged -= HandleObjectiveChanged;
             }
 
-            if (weaponSelection != null)
+            if (superpowerSelection != null)
             {
-                weaponSelection.SelectionChanged -= HandleWeaponChanged;
-                weaponSelection.WeaponLocked -= HandleWeaponChanged;
+                superpowerSelection.SelectionChanged -= HandleSuperpowerChanged;
+                superpowerSelection.SuperpowerLocked -= HandleSuperpowerChanged;
             }
         }
 
@@ -193,16 +193,16 @@ namespace BattleForYourSoul.UI
             stageLabel.text = current != null ? current.DisplayName : $"Stage {stage}";
         }
 
-        private void HandleWeaponChanged(WeaponDefinition weapon)
+        private void HandleSuperpowerChanged(SuperpowerDefinition superpower)
         {
-            if (weaponLabel == null)
+            if (superpowerLabel == null)
             {
                 return;
             }
 
-            string name = weapon != null ? weapon.DisplayName : "none";
-            string suffix = weaponSelection != null && weaponSelection.IsLocked ? " (locked)" : "";
-            weaponLabel.text = $"Weapon: {name}{suffix}";
+            string name = superpower != null ? superpower.DisplayName : "none";
+            string suffix = superpowerSelection != null && superpowerSelection.IsLocked ? " (locked)" : "";
+            superpowerLabel.text = $"Superpower: {name}{suffix}";
             HandleObjectiveChanged();
         }
 
@@ -216,12 +216,12 @@ namespace BattleForYourSoul.UI
             UpgradeCategoryDefinition pending = levelDirector.PendingRewardCategory;
             string reward = pending != null ? pending.DisplayName : "none";
 
-            if (levelDirector.IsWeaponSelectionStage)
+            if (levelDirector.IsSuperpowerSelectionStage)
             {
-                bool hasWeapon = weaponSelection != null && weaponSelection.SelectedWeapon != null;
-                objectiveLabel.text = !hasWeapon
-                    ? "Pick up a weapon to begin - clear reward: " + reward
-                    : $"Take the exit to lock {weaponSelection.SelectedWeapon.DisplayName} - clear reward: {reward}";
+                bool hasSuperpower = superpowerSelection != null && superpowerSelection.SelectedSuperpower != null;
+                objectiveLabel.text = !hasSuperpower
+                    ? "Pick up a superpower to begin - clear reward: " + reward
+                    : $"Take the exit to lock {superpowerSelection.SelectedSuperpower.DisplayName} - clear reward: {reward}";
                 return;
             }
 

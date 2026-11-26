@@ -16,7 +16,7 @@ using BattleForYourSoul.Player;
 using BattleForYourSoul.Progression;
 using BattleForYourSoul.UI;
 using BattleForYourSoul.VFX;
-using BattleForYourSoul.Weapons;
+using BattleForYourSoul.Superpowers;
 using BattleForYourSoul.World;
 
 namespace BattleForYourSoul.EditorTools
@@ -24,7 +24,7 @@ namespace BattleForYourSoul.EditorTools
     /// <summary>
     /// Builds the isometric test scene from scratch: settings asset, prefabs, definitions, isometric
     /// grid, ground tilemap, obstacles, collision walls, visible exit doors, pixel-perfect camera,
-    /// 2D light, the combat loop (enemy registry, fixed-placement spawner, player weapon), the
+    /// 2D light, the combat loop (enemy registry, fixed-placement spawner, player superpower), the
     /// stage/XP progression, category rewards and the HUD.
     ///
     /// This is authoring tooling, not gameplay. Re-running it regenerates the scene deterministically.
@@ -44,9 +44,9 @@ namespace BattleForYourSoul.EditorTools
         private const string EnemyPrefabPath = "Assets/_Project/Prefabs/Enemy.prefab";
         private const string ProjectilePrefabPath = "Assets/_Project/Prefabs/Projectile.prefab";
         private const string AttackVfxPrefabPath = "Assets/_Project/Prefabs/AttackVfx.prefab";
-        private const string WeaponDefinitionPath = "Assets/_Project/ScriptableObjects/Weapon_Default.asset";
-        private const string WeaponsFolder = "Assets/_Project/ScriptableObjects/Weapons";
-        private const string WeaponActionsFolder = "Assets/_Project/ScriptableObjects/Weapons/Actions";
+        private const string SuperpowerDefinitionPath = "Assets/_Project/ScriptableObjects/Superpower_Default.asset";
+        private const string SuperpowersFolder = "Assets/_Project/ScriptableObjects/Superpowers";
+        private const string SuperpowerActionsFolder = "Assets/_Project/ScriptableObjects/Superpowers/Actions";
         private const string EnemyDefinitionPath = "Assets/_Project/ScriptableObjects/Enemy_Grunt.asset";
         private const string PlayerDefinitionPath = "Assets/_Project/ScriptableObjects/Player_Default.asset";
         private const string ProgressionDefinitionPath = "Assets/_Project/ScriptableObjects/Progression_Default.asset";
@@ -66,9 +66,11 @@ namespace BattleForYourSoul.EditorTools
         private const string ArrowSpritePath = "Assets/_Project/Art/VFX/Projectile_Arrow.png";
         private const string SlashVfxSpritePath = "Assets/_Project/Art/VFX/VFX_Slash.png";
         private const string ThrustVfxSpritePath = "Assets/_Project/Art/VFX/VFX_Thrust.png";
-        private const string SwordSpritePath = "Assets/_Project/Art/Items/Weapon_Sword.png";
-        private const string SpearSpritePath = "Assets/_Project/Art/Items/Weapon_Spear.png";
-        private const string BowSpritePath = "Assets/_Project/Art/Items/Weapon_Bow.png";
+        private const string SwordSpritePath = "Assets/_Project/Art/Items/Superpower_Sword.png";
+        private const string SpearSpritePath = "Assets/_Project/Art/Items/Superpower_Spear.png";
+        private const string BowSpritePath = "Assets/_Project/Art/Items/Superpower_Bow.png";
+        private const string FistsSpritePath = "Assets/_Project/Art/Items/Superpower_Fists.png";
+        private const string PunchFramePath = "Assets/_Project/Art/Animation/Anim_Punch_0.png";
         private const string UpgradeIconSpritePath = "Assets/_Project/Art/UI/Upgrade_Icon.png";
         private const string DoorClosedSpritePath = "Assets/_Project/Art/Environment/Door_Closed.png";
         private const string DoorOpenSpritePath = "Assets/_Project/Art/Environment/Door_Open.png";
@@ -86,20 +88,22 @@ namespace BattleForYourSoul.EditorTools
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             // Placeholder art must exist before any asset seeding: newly added sprites are loaded by
-            // the weapon/action seeders below, and LoadSprite would otherwise cache a null reference.
+            // the superpower/action seeders below, and LoadSprite would otherwise cache a null reference.
             EnsurePlaceholderSprites();
 
             GameSettings settings = EnsureSettings();
-            WeaponActions actions = EnsureWeaponActions();
-            WeaponDefinition[] weapons = EnsureWeapons(actions);
-            EnsureLegacyWeaponDefinition(actions);
+            SuperpowerActions actions = EnsureSuperpowerActions();
+            SuperpowerDefinition[] superpowers = EnsureSuperpowers(actions);
+            int superstrengthIndex = superpowers.Length > 0 ? superpowers.Length - 1 : 0;
+            EnsureLegacySuperpowerDefinition(actions);
             EnemyDefinition enemyDefinition = EnsureEnemyDefinition();
-            PlayerDefinition playerDefinition = EnsurePlayerDefinition(weapons.Length > 0 ? weapons[0] : null);
+            PlayerDefinition playerDefinition = EnsurePlayerDefinition(superpowers.Length > 0 ? superpowers[0] : null);
             ProgressionDefinition progression = EnsureProgressionDefinition();
             MonsterScaling scaling = EnsureMonsterScaling();
 
             var categories = EnsureUpgradeCategories();
-            UpgradeDefinition[] upgrades = EnsureUpgrades(categories.shots, categories.mobility, categories.vitality, weapons);
+            UpgradeDefinition[] upgrades = EnsureUpgrades(
+                categories.shots, categories.mobility, categories.vitality, categories.superpowers, superpowers, actions, superstrengthIndex);
             UpgradePool upgradePool = EnsureUpgradePool(upgrades);
             StageDefinition[] stages = EnsureStages(enemyDefinition);
             StageProgression stageProgression = EnsureStageProgression(stages);
@@ -123,15 +127,16 @@ namespace BattleForYourSoul.EditorTools
             player.name = "Player";
             player.transform.position = new Vector3(settings.RoomEntrance.x, settings.RoomEntrance.y, 0f);
 
-            (EnemySpawner spawner, WeaponSelection selection) = BuildCombat(player, enemyDefinition, enemyPrefab, projectilePrefab, attackVfxPrefab, weapons, settings);
-            (Experience experience, LevelDirector levelDirector) = BuildProgression(player, spawner, scaling, progression, stageProgression, playerDefinition);
+            (EnemySpawner spawner, SuperpowerSelection selection) = BuildCombat(player, enemyDefinition, enemyPrefab, projectilePrefab, attackVfxPrefab, superpowers, settings);
+            (Experience experience, LevelDirector levelDirector) = BuildProgression(player, spawner, scaling, progression, stageProgression, playerDefinition, selection);
 
             StageDoor[] doors = BuildDoors(environment.transform, settings, categories, levelDirector);
             CameraFollow cameraFollow = BuildCamera(player.transform, settings);
             BuildLight();
             LevelUpController levelUp = BuildHud(player, spawner, experience, levelDirector, upgradePool, selection);
 
-            WireDirector(levelDirector, settings, player, cameraFollow, levelUp, doors, selection);
+            WireDirector(levelDirector, settings, player, cameraFollow, levelUp, experience, doors, selection,
+                player.GetComponent<RunUpgradeState>(), player.GetComponent<PlayerStats>());
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, GameScenePath);
@@ -164,46 +169,84 @@ namespace BattleForYourSoul.EditorTools
                 return settings;
             }
 
-            // Existing assets predate the room fixtures; seed only when the list is empty.
+            // There are three category doors. Pedestals still need four slots, one per superpower,
+            // including Superstrength. Keep any authored positions and only trim an obsolete 4th door.
             var serialized = new SerializedObject(settings);
-            SerializedProperty doors = serialized.FindProperty("doorPositions");
-            if (doors != null && doors.arraySize == 0)
+            var defaultDoors = new[]
             {
-                var defaults = new[]
+                new Vector2(-3.2f, 3.55f),
+                new Vector2(0f, 3.85f),
+                new Vector2(3.2f, 3.55f),
+            };
+            SerializedProperty doors = serialized.FindProperty("doorPositions");
+            bool changedDoors = false;
+            if (doors != null)
+            {
+                if (doors.arraySize == 0)
                 {
-                    new Vector2(-3.2f, 3.55f),
-                    new Vector2(0f, 3.85f),
-                    new Vector2(3.2f, 3.55f),
-                };
+                    doors.arraySize = defaultDoors.Length;
+                    for (int i = 0; i < defaultDoors.Length; i++)
+                    {
+                        doors.GetArrayElementAtIndex(i).vector2Value = defaultDoors[i];
+                    }
 
-                doors.arraySize = defaults.Length;
-                for (int i = 0; i < defaults.Length; i++)
-                {
-                    doors.GetArrayElementAtIndex(i).vector2Value = defaults[i];
+                    changedDoors = true;
                 }
+                else if (doors.arraySize < defaultDoors.Length)
+                {
+                    int first = doors.arraySize;
+                    doors.arraySize = defaultDoors.Length;
+                    for (int i = first; i < defaultDoors.Length; i++)
+                    {
+                        doors.GetArrayElementAtIndex(i).vector2Value = defaultDoors[i];
+                    }
 
-                serialized.ApplyModifiedPropertiesWithoutUndo();
-                EditorUtility.SetDirty(settings);
-                AssetDatabase.SaveAssets();
+                    changedDoors = true;
+                }
+                else if (doors.arraySize > defaultDoors.Length)
+                {
+                    // An older four-door setup kept a Superpowers exit; that door is gone.
+                    doors.arraySize = defaultDoors.Length;
+                    changedDoors = true;
+                }
             }
 
-            // Samsara's props are a new required fixture; backfill them without touching authored doors.
-            var pedestals = serialized.FindProperty("weaponPedestalPositions");
-            if (pedestals != null && pedestals.arraySize == 0)
+            var defaultPedestals = new[]
             {
-                var defaults = new[]
+                new Vector2(-5.2f, -1f),
+                new Vector2(-1.8f, -1.8f),
+                new Vector2(1.8f, -1.8f),
+                new Vector2(5.2f, -1f),
+            };
+            SerializedProperty pedestals = serialized.FindProperty("superpowerPedestalPositions");
+            bool changedPedestals = false;
+            if (pedestals != null)
+            {
+                if (pedestals.arraySize == 0)
                 {
-                    new Vector2(-4f, -1.2f),
-                    new Vector2(0f, -1.8f),
-                    new Vector2(4f, -1.2f),
-                };
+                    pedestals.arraySize = defaultPedestals.Length;
+                    for (int i = 0; i < defaultPedestals.Length; i++)
+                    {
+                        pedestals.GetArrayElementAtIndex(i).vector2Value = defaultPedestals[i];
+                    }
 
-                pedestals.arraySize = defaults.Length;
-                for (int i = 0; i < defaults.Length; i++)
-                {
-                    pedestals.GetArrayElementAtIndex(i).vector2Value = defaults[i];
+                    changedPedestals = true;
                 }
+                else if (pedestals.arraySize < defaultPedestals.Length)
+                {
+                    int first = pedestals.arraySize;
+                    pedestals.arraySize = defaultPedestals.Length;
+                    for (int i = first; i < defaultPedestals.Length; i++)
+                    {
+                        pedestals.GetArrayElementAtIndex(i).vector2Value = defaultPedestals[i];
+                    }
 
+                    changedPedestals = true;
+                }
+            }
+
+            if (changedDoors || changedPedestals)
+            {
                 serialized.ApplyModifiedPropertiesWithoutUndo();
                 EditorUtility.SetDirty(settings);
                 AssetDatabase.SaveAssets();
@@ -212,14 +255,15 @@ namespace BattleForYourSoul.EditorTools
             return settings;
         }
 
-        private static (UpgradeCategoryDefinition shots, UpgradeCategoryDefinition mobility, UpgradeCategoryDefinition vitality) EnsureUpgradeCategories()
+        private static (UpgradeCategoryDefinition shots, UpgradeCategoryDefinition mobility, UpgradeCategoryDefinition vitality, UpgradeCategoryDefinition superpowers) EnsureUpgradeCategories()
         {
             EnsureFolder(UpgradeCategoriesFolder);
 
             return (
                 EnsureCategory("UpgradeCategory_Shots", "Shots", "Sharpen bolts and bend their flight.", new Color32(244, 152, 88, 255)),
                 EnsureCategory("UpgradeCategory_Mobility", "Mobility", "Move faster and outmaneuver the room.", new Color32(112, 220, 156, 255)),
-                EnsureCategory("UpgradeCategory_Vitality", "Vitality", "Survive longer under pressure.", new Color32(236, 120, 160, 255)));
+                EnsureCategory("UpgradeCategory_Vitality", "Vitality", "Survive longer under pressure.", new Color32(236, 120, 160, 255)),
+                EnsureCategory("UpgradeCategory_Superpowers", "Superpowers", "Unique and powerful upgrades for your superpower.", new Color32(248, 214, 96, 255)));
         }
 
         private static UpgradeCategoryDefinition EnsureCategory(string fileName, string displayName, string description, Color32 color)
@@ -254,10 +298,17 @@ namespace BattleForYourSoul.EditorTools
             player.layer = LayerMask.NameToLayer("Player");
             player.tag = "Player";
 
-            var spriteRenderer = player.AddComponent<SpriteRenderer>();
+            // The sprite MUST live on a child. Attack poses (and Hulk/Man of Steel growth) write to
+            // this renderer's transform; putting it on the root used to drag the physics body back to
+            // a stale position on every attack.
+            var visual = new GameObject("Visual");
+            visual.layer = player.layer;
+            visual.transform.SetParent(player.transform, false);
+            var spriteRenderer = visual.AddComponent<SpriteRenderer>();
             spriteRenderer.sprite = definition != null ? definition.Sprite : LoadSprite(PlayerSpritePath);
             spriteRenderer.sortingLayerName = settings.EntitySortingLayer;
-            player.AddComponent<IsometricSpriteSorter>();
+            var sorter = visual.AddComponent<IsometricSpriteSorter>();
+            SetSerializedReference(sorter, "targetRenderer", spriteRenderer);
 
             var body = player.AddComponent<Rigidbody2D>();
             body.gravityScale = 0f;
@@ -275,6 +326,10 @@ namespace BattleForYourSoul.EditorTools
             var movement = player.AddComponent<PlayerMovement>();
             SetSerializedReference(movement, "definition", definition);
 
+            // Attack steps own position directly for their short duration; the movement component
+            // simply suspends input while this is active.
+            player.AddComponent<AttackMovement>();
+
             var dash = player.AddComponent<PlayerDash>();
             SetSerializedReference(dash, "definition", definition);
             SetSerializedFloat(dash, "dashSpeed", definition != null ? definition.DashSpeed : 14f);
@@ -284,6 +339,14 @@ namespace BattleForYourSoul.EditorTools
 
             var visuals = player.AddComponent<PlayerVisuals>();
             SetSerializedReference(visuals, "definition", definition);
+            SetSerializedReference(visuals, "spriteRenderer", spriteRenderer);
+
+            var posePlayer = player.AddComponent<SuperpowerPosePlayer>();
+            SetSerializedReference(posePlayer, "spriteRenderer", spriteRenderer);
+
+            // Run-scoped upgrade record. It lives on the player so every gameplay system can reach it
+            // through serialized references without any static state.
+            player.AddComponent<RunUpgradeState>();
 
             var health = player.AddComponent<Health>();
             SetSerializedFloat(health, "maxHealth", definition != null ? definition.MaxHealth : PlayerMaxHealth);
@@ -397,53 +460,244 @@ namespace BattleForYourSoul.EditorTools
             return prefab;
         }
 
-        private struct WeaponActions
+        private struct SuperpowerActions
         {
-            public WeaponActionDefinition SwordSlash;
-            public WeaponActionDefinition SwordCleave;
-            public WeaponActionDefinition SpearThrust;
-            public WeaponActionDefinition SpearSweep;
-            public WeaponActionDefinition BowShot;
-            public WeaponActionDefinition BowSpread;
+            public SuperpowerActionDefinition SwordSlash;
+            public SuperpowerActionDefinition SwordCleave;
+            public SuperpowerActionDefinition SpearThrust;
+            public SuperpowerActionDefinition SpearSweep;
+            public SuperpowerActionDefinition BowShot;
+            public SuperpowerActionDefinition BowSpread;
+            public SuperpowerActionDefinition Punch;
+            public SuperpowerActionDefinition Uppercut;
+            public SuperpowerActionDefinition NorthernStar;
+            public SuperpowerActionDefinition BodySlam;
         }
 
-        private static WeaponActions EnsureWeaponActions()
+        private struct AnimationSeed
         {
-            EnsureFolder(WeaponActionsFolder);
+            public string[] FramePaths;
+            public float FrameDuration;
+            public Vector2 HopOffset;
+            public float LungeDistance;
+            public float LungeDuration;
+        }
 
-            return new WeaponActions
+        private struct ActionSeed
+        {
+            public string FileName;
+            public string DisplayName;
+            public SuperpowerAttackShape Shape;
+            public float Cooldown;
+            public float Damage;
+            public float Range;
+            public float ArcDegrees;
+            public float LineWidth;
+            public int HitCount;
+            public float HitDelay;
+            public float HitInterval;
+            public bool SweepHitsWhileLunging;
+            public HitEffects OnHit;
+            public AnimationSeed Animation;
+            public int ProjectilesPerShot;
+            public float SpreadDegrees;
+            public float ProjectileSpeed;
+            public float ProjectileLifetime;
+            public string ProjectileSpritePath;
+            public string HitVfxSpritePath;
+            public Color HitVfxColor;
+            public float HitVfxSize;
+            public float HitVfxDuration;
+            public float HitVfxSweep;
+        }
+
+        private static string[] Anim(string name, int count)
+        {
+            var paths = new string[count];
+            for (int i = 0; i < count; i++)
             {
-                SwordSlash = EnsureWeaponAction("Action_Sword_Slash", "Slash", WeaponAttackShape.MeleeArc, 0.42f, 2f, 1.2f, 110f, 0.4f, 1, 0f, 14f, 1f, null, LoadSprite(SlashVfxSpritePath), new Color32(250, 250, 255, 255), 1.6f, 0.18f, 90f),
-                SwordCleave = EnsureWeaponAction("Action_Sword_Cleave", "Cleave", WeaponAttackShape.MeleeArc, 1.4f, 3f, 1.5f, 200f, 0.4f, 1, 0f, 14f, 1f, null, LoadSprite(SlashVfxSpritePath), new Color32(255, 238, 210, 255), 2.2f, 0.24f, 160f),
-                SpearThrust = EnsureWeaponAction("Action_Spear_Thrust", "Thrust", WeaponAttackShape.Line, 0.5f, 2f, 2f, 360f, 0.35f, 1, 0f, 14f, 1f, null, LoadSprite(ThrustVfxSpritePath), new Color32(238, 248, 255, 255), 2.2f, 0.16f, 0f),
-                SpearSweep = EnsureWeaponAction("Action_Spear_Sweep", "Sweep", WeaponAttackShape.Line, 1.5f, 3f, 2.4f, 360f, 0.9f, 1, 0f, 14f, 1f, null, LoadSprite(ThrustVfxSpritePath), new Color32(255, 240, 210, 255), 2.8f, 0.22f, 0f),
-                BowShot = EnsureWeaponAction("Action_Bow_Shot", "Shot", WeaponAttackShape.Projectile, 0.34f, 1f, 8f, 360f, 0.4f, 1, 0f, 15f, 1.1f, LoadSprite(ArrowSpritePath), null, Color.white, 1.4f, 0.22f, 0f),
-                BowSpread = EnsureWeaponAction("Action_Bow_Spread", "Spread", WeaponAttackShape.Projectile, 1.5f, 1f, 8f, 360f, 0.4f, 2, 22f, 12f, 1f, LoadSprite(ArrowSpritePath), null, Color.white, 1.4f, 0.22f, 0f),
+                paths[i] = $"Assets/_Project/Art/Animation/Anim_{name}_{i}.png";
+            }
+
+            return paths;
+        }
+
+        /// <summary>Every frame generated by PlaceholderArtGenerator and referenced by a seed.</summary>
+        private static string[] RequiredAnimationPaths()
+        {
+            var paths = new List<string>();
+            paths.AddRange(Anim("Punch", 3));
+            paths.AddRange(Anim("Uppercut", 4));
+            paths.AddRange(Anim("NorthernStar", 6));
+            paths.AddRange(Anim("BodySlam", 5));
+            paths.AddRange(Anim("Charge", 3));
+            paths.AddRange(Anim("Sword_Slash", 2));
+            paths.AddRange(Anim("Sword_Cleave", 3));
+            paths.AddRange(Anim("Spear_Thrust", 2));
+            paths.AddRange(Anim("Spear_Sweep", 3));
+            paths.AddRange(Anim("Bow_Shot", 2));
+            paths.AddRange(Anim("Bow_Spread", 3));
+            return paths.ToArray();
+        }
+
+        private static SuperpowerActions EnsureSuperpowerActions()
+        {
+            EnsureFolder(SuperpowerActionsFolder);
+
+            var foeRoot = new HitEffects
+            {
+                RootDuration = 0.3f,
+                KnockbackForce = 3f,
+                KnockbackDuration = 0.18f,
+                ContactDamageDisabledDuration = 0.35f,
+            };
+
+            return new SuperpowerActions
+            {
+                SwordSlash = EnsureSuperpowerAction(new ActionSeed
+                {
+                    FileName = "Action_Sword_Slash", DisplayName = "Slash", Shape = SuperpowerAttackShape.MeleeArc,
+                    Cooldown = 0.42f, Damage = 2f, Range = 1.2f, ArcDegrees = 110f, LineWidth = 0.4f,
+                    HitCount = 1, HitVfxSpritePath = SlashVfxSpritePath, HitVfxColor = new Color32(250, 250, 255, 255),
+                    HitVfxSize = 1.6f, HitVfxDuration = 0.18f, HitVfxSweep = 90f,
+                    Animation = new AnimationSeed { FramePaths = Anim("Sword_Slash", 2), FrameDuration = 0.2f, LungeDuration = 0.2f },
+                }),
+                SwordCleave = EnsureSuperpowerAction(new ActionSeed
+                {
+                    FileName = "Action_Sword_Cleave", DisplayName = "Cleave", Shape = SuperpowerAttackShape.MeleeArc,
+                    Cooldown = 1.4f, Damage = 3f, Range = 1.5f, ArcDegrees = 200f, LineWidth = 0.4f,
+                    HitCount = 1, HitVfxSpritePath = SlashVfxSpritePath, HitVfxColor = new Color32(255, 238, 210, 255),
+                    HitVfxSize = 2.2f, HitVfxDuration = 0.24f, HitVfxSweep = 160f,
+                    Animation = new AnimationSeed { FramePaths = Anim("Sword_Cleave", 3), FrameDuration = 0.45f, LungeDuration = 0.4f },
+                }),
+                SpearThrust = EnsureSuperpowerAction(new ActionSeed
+                {
+                    FileName = "Action_Spear_Thrust", DisplayName = "Thrust", Shape = SuperpowerAttackShape.Line,
+                    Cooldown = 0.5f, Damage = 2f, Range = 2f, ArcDegrees = 360f, LineWidth = 0.35f,
+                    HitCount = 1, HitVfxSpritePath = ThrustVfxSpritePath, HitVfxColor = new Color32(238, 248, 255, 255),
+                    HitVfxSize = 2.2f, HitVfxDuration = 0.16f,
+                    Animation = new AnimationSeed { FramePaths = Anim("Spear_Thrust", 2), FrameDuration = 0.24f, LungeDistance = 0.3f, LungeDuration = 0.24f },
+                }),
+                SpearSweep = EnsureSuperpowerAction(new ActionSeed
+                {
+                    FileName = "Action_Spear_Sweep", DisplayName = "Sweep", Shape = SuperpowerAttackShape.Line,
+                    Cooldown = 1.5f, Damage = 3f, Range = 2.4f, ArcDegrees = 360f, LineWidth = 0.9f,
+                    HitCount = 1, HitVfxSpritePath = ThrustVfxSpritePath, HitVfxColor = new Color32(255, 240, 210, 255),
+                    HitVfxSize = 2.8f, HitVfxDuration = 0.22f,
+                    Animation = new AnimationSeed { FramePaths = Anim("Spear_Sweep", 3), FrameDuration = 0.5f, LungeDuration = 0.4f },
+                }),
+                BowShot = EnsureSuperpowerAction(new ActionSeed
+                {
+                    FileName = "Action_Bow_Shot", DisplayName = "Shot", Shape = SuperpowerAttackShape.Projectile,
+                    Cooldown = 0.34f, Damage = 1f, Range = 8f, ArcDegrees = 360f, LineWidth = 0.4f,
+                    HitCount = 1, ProjectilesPerShot = 1, ProjectileSpeed = 15f, ProjectileLifetime = 1.1f,
+                    ProjectileSpritePath = ArrowSpritePath,
+                    Animation = new AnimationSeed { FramePaths = Anim("Bow_Shot", 2), FrameDuration = 0.16f },
+                }),
+                BowSpread = EnsureSuperpowerAction(new ActionSeed
+                {
+                    FileName = "Action_Bow_Spread", DisplayName = "Spread", Shape = SuperpowerAttackShape.Projectile,
+                    Cooldown = 1.5f, Damage = 1f, Range = 8f, ArcDegrees = 360f, LineWidth = 0.4f,
+                    HitCount = 1, ProjectilesPerShot = 2, SpreadDegrees = 22f, ProjectileSpeed = 12f, ProjectileLifetime = 1f,
+                    ProjectileSpritePath = ArrowSpritePath,
+                    Animation = new AnimationSeed { FramePaths = Anim("Bow_Spread", 3), FrameDuration = 0.5f },
+                }),
+
+                // Superstrength. Cooldowns match the placeholder animation length: the 3-hit combo
+                // takes roughly twice as long as a single punch, so its cooldown is doubled there.
+                Punch = EnsureSuperpowerAction(new ActionSeed
+                {
+                    FileName = "Action_Superstrength_Punch", DisplayName = "Punch", Shape = SuperpowerAttackShape.MeleeArc,
+                    Cooldown = 0.28f, Damage = 2f, Range = 1.05f, ArcDegrees = 100f, LineWidth = 0.4f,
+                    HitCount = 1, OnHit = foeRoot,
+                    HitVfxSpritePath = ThrustVfxSpritePath, HitVfxColor = new Color32(196, 244, 176, 255),
+                    HitVfxSize = 1.2f, HitVfxDuration = 0.14f,
+                    Animation = new AnimationSeed
+                    {
+                        FramePaths = Anim("Punch", 3), FrameDuration = 0.09f,
+                        HopOffset = new Vector2(0.08f, 0.04f), LungeDistance = 0.5f, LungeDuration = 0.18f,
+                    },
+                }),
+                Uppercut = EnsureSuperpowerAction(new ActionSeed
+                {
+                    FileName = "Action_Superstrength_Uppercut", DisplayName = "Uppercut", Shape = SuperpowerAttackShape.MeleeArc,
+                    Cooldown = 1.6f, Damage = 5f, Range = 1.3f, ArcDegrees = 110f, LineWidth = 0.4f,
+                    HitCount = 1, SweepHitsWhileLunging = true,
+                    OnHit = new HitEffects
+                    {
+                        RootDuration = 0.3f, KnockbackForce = 6f, KnockbackDuration = 0.3f,
+                        ContactDamageDisabledDuration = 0.45f,
+                    },
+                    HitVfxSpritePath = SlashVfxSpritePath, HitVfxColor = new Color32(255, 226, 128, 255),
+                    HitVfxSize = 1.7f, HitVfxDuration = 0.22f, HitVfxSweep = 120f,
+                    Animation = new AnimationSeed
+                    {
+                        FramePaths = Anim("Uppercut", 4), FrameDuration = 0.38f,
+                        HopOffset = new Vector2(0f, 0.45f), LungeDistance = 1.5f, LungeDuration = 0.55f,
+                    },
+                }),
+                NorthernStar = EnsureSuperpowerAction(new ActionSeed
+                {
+                    FileName = "Action_Superstrength_NorthernStar", DisplayName = "Northern Star Strike", Shape = SuperpowerAttackShape.MeleeArc,
+                    Cooldown = 0.56f, Damage = 2f, Range = 1.1f, ArcDegrees = 110f, LineWidth = 0.4f,
+                    HitCount = 3, HitDelay = 0.04f, HitInterval = 0.17f, OnHit = foeRoot,
+                    HitVfxSpritePath = ThrustVfxSpritePath, HitVfxColor = new Color32(188, 226, 255, 255),
+                    HitVfxSize = 1.25f, HitVfxDuration = 0.13f,
+                    Animation = new AnimationSeed
+                    {
+                        FramePaths = Anim("NorthernStar", 6), FrameDuration = 0.09f,
+                        HopOffset = new Vector2(0.12f, 0.08f), LungeDistance = 0.5f, LungeDuration = 0.52f,
+                    },
+                }),
+                BodySlam = EnsureSuperpowerAction(new ActionSeed
+                {
+                    FileName = "Action_Superstrength_BodySlam", DisplayName = "Body Slam", Shape = SuperpowerAttackShape.MeleeArc,
+                    Cooldown = 1.8f, Damage = 7f, Range = 1.55f, ArcDegrees = 150f, LineWidth = 0.4f,
+                    HitCount = 1, SweepHitsWhileLunging = true,
+                    OnHit = new HitEffects
+                    {
+                        RootDuration = 0.3f, KnockbackForce = 8f, KnockbackDuration = 0.35f,
+                        ContactDamageDisabledDuration = 0.5f,
+                    },
+                    HitVfxSpritePath = SlashVfxSpritePath, HitVfxColor = new Color32(236, 168, 120, 255),
+                    HitVfxSize = 2.4f, HitVfxDuration = 0.28f, HitVfxSweep = 40f,
+                    Animation = new AnimationSeed
+                    {
+                        FramePaths = Anim("BodySlam", 5), FrameDuration = 0.34f,
+                        HopOffset = new Vector2(0f, 0.7f), LungeDistance = 1.5f, LungeDuration = 0.6f,
+                    },
+                }),
             };
         }
 
-        private static WeaponActionDefinition EnsureWeaponAction(
-            string fileName,
-            string displayName,
-            WeaponAttackShape shape,
-            float cooldown,
-            float damage,
-            float range,
-            float arcDegrees,
-            float lineWidth,
-            int projectilesPerShot,
-            float spreadDegrees,
-            float projectileSpeed,
-            float projectileLifetime,
-            Sprite projectileSprite,
-            Sprite hitVfxSprite,
-            Color hitVfxColor,
-            float hitVfxSize,
-            float hitVfxDuration,
-            float hitVfxSweep)
+        private static Sprite[] LoadFrames(string[] paths)
         {
-            string path = $"{WeaponActionsFolder}/{fileName}.asset";
-            var (action, created) = EnsureAsset<WeaponActionDefinition>(path);
+            if (paths == null)
+            {
+                return new Sprite[0];
+            }
+
+            var frames = new Sprite[paths.Length];
+            for (int i = 0; i < paths.Length; i++)
+            {
+                frames[i] = LoadSprite(paths[i]);
+            }
+
+            return frames;
+        }
+
+        private static SuperpowerActionDefinition EnsureSuperpowerAction(ActionSeed seed)
+        {
+            string path = $"{SuperpowerActionsFolder}/{seed.FileName}.asset";
+            var (action, created) = EnsureAsset<SuperpowerActionDefinition>(path);
+
+            Sprite projectileSprite = !string.IsNullOrEmpty(seed.ProjectileSpritePath)
+                ? LoadSprite(seed.ProjectileSpritePath)
+                : null;
+            Sprite hitVfxSprite = !string.IsNullOrEmpty(seed.HitVfxSpritePath)
+                ? LoadSprite(seed.HitVfxSpritePath)
+                : null;
+            Sprite[] frames = LoadFrames(seed.Animation.FramePaths);
 
             // Placeholder art may have been generated after a previous build seeded this action, so
             // backfill missing references without overwriting anything a designer has authored.
@@ -452,7 +706,9 @@ namespace BattleForYourSoul.EditorTools
                 SeedReferenceIfMissing(action, "projectileSprite", projectileSprite);
             }
 
-            SeedHitVfxFields(action, hitVfxSprite, hitVfxColor, hitVfxSize, hitVfxDuration, hitVfxSweep);
+            SeedHitVfxFields(action, hitVfxSprite, seed.HitVfxColor, seed.HitVfxSize, seed.HitVfxDuration, seed.HitVfxSweep);
+            SeedAnimationIfEmpty(action, seed.Animation, frames);
+            SeedHitEffectsIfEmpty(action, seed.OnHit);
 
             if (!created)
             {
@@ -460,18 +716,24 @@ namespace BattleForYourSoul.EditorTools
             }
 
             var serialized = new SerializedObject(action);
-            serialized.FindProperty("displayName").stringValue = displayName;
-            serialized.FindProperty("shape").enumValueIndex = (int)shape;
-            serialized.FindProperty("cooldown").floatValue = cooldown;
-            serialized.FindProperty("damage").floatValue = damage;
-            serialized.FindProperty("range").floatValue = range;
-            serialized.FindProperty("arcDegrees").floatValue = arcDegrees;
-            serialized.FindProperty("lineWidth").floatValue = lineWidth;
-            serialized.FindProperty("projectilesPerShot").intValue = projectilesPerShot;
-            serialized.FindProperty("spreadDegrees").floatValue = spreadDegrees;
-            serialized.FindProperty("projectileSpeed").floatValue = projectileSpeed;
-            serialized.FindProperty("projectileLifetime").floatValue = projectileLifetime;
+            serialized.FindProperty("displayName").stringValue = seed.DisplayName;
+            serialized.FindProperty("shape").enumValueIndex = (int)seed.Shape;
+            serialized.FindProperty("cooldown").floatValue = seed.Cooldown;
+            serialized.FindProperty("damage").floatValue = seed.Damage;
+            serialized.FindProperty("range").floatValue = seed.Range;
+            serialized.FindProperty("arcDegrees").floatValue = seed.ArcDegrees;
+            serialized.FindProperty("lineWidth").floatValue = seed.LineWidth;
+            serialized.FindProperty("hitCount").intValue = seed.HitCount;
+            serialized.FindProperty("hitDelay").floatValue = seed.HitDelay;
+            serialized.FindProperty("hitInterval").floatValue = seed.HitInterval;
+            serialized.FindProperty("sweepHitsWhileLunging").boolValue = seed.SweepHitsWhileLunging;
+            serialized.FindProperty("projectilesPerShot").intValue = seed.ProjectilesPerShot;
+            serialized.FindProperty("spreadDegrees").floatValue = seed.SpreadDegrees;
+            serialized.FindProperty("projectileSpeed").floatValue = seed.ProjectileSpeed;
+            serialized.FindProperty("projectileLifetime").floatValue = seed.ProjectileLifetime;
             serialized.FindProperty("projectileSprite").objectReferenceValue = projectileSprite;
+            WriteAnimation(serialized.FindProperty("animation"), seed.Animation, frames);
+            WriteHitEffects(serialized.FindProperty("onHit"), seed.OnHit);
 
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(action);
@@ -479,53 +741,160 @@ namespace BattleForYourSoul.EditorTools
             return action;
         }
 
-        private static WeaponDefinition[] EnsureWeapons(WeaponActions actions)
+        private static void WriteAnimation(SerializedProperty property, AnimationSeed seed, Sprite[] frames)
         {
-            EnsureFolder(WeaponsFolder);
+            SerializedProperty frameArray = property.FindPropertyRelative("Frames");
+            frameArray.arraySize = frames.Length;
+            for (int i = 0; i < frames.Length; i++)
+            {
+                frameArray.GetArrayElementAtIndex(i).objectReferenceValue = frames[i];
+            }
+
+            property.FindPropertyRelative("FrameDuration").floatValue = seed.FrameDuration;
+            property.FindPropertyRelative("HopOffset").vector2Value = seed.HopOffset;
+            property.FindPropertyRelative("LungeDistance").floatValue = seed.LungeDistance;
+            property.FindPropertyRelative("LungeDuration").floatValue = seed.LungeDuration;
+        }
+
+        private static void WriteHitEffects(SerializedProperty property, HitEffects effects)
+        {
+            property.FindPropertyRelative("RootDuration").floatValue = effects.RootDuration;
+            property.FindPropertyRelative("RootAffectsSpecialFoes").boolValue = effects.RootAffectsSpecialFoes;
+            property.FindPropertyRelative("StunDuration").floatValue = effects.StunDuration;
+            property.FindPropertyRelative("KnockbackForce").floatValue = effects.KnockbackForce;
+            property.FindPropertyRelative("KnockbackDuration").floatValue = effects.KnockbackDuration;
+            property.FindPropertyRelative("KnockbackAffectsSpecialFoes").boolValue = effects.KnockbackAffectsSpecialFoes;
+            property.FindPropertyRelative("GuardBreak").boolValue = effects.GuardBreak;
+            property.FindPropertyRelative("ContactDamageDisabledDuration").floatValue = effects.ContactDamageDisabledDuration;
+        }
+
+        private static void SeedAnimationIfEmpty(SuperpowerActionDefinition action, AnimationSeed seed, Sprite[] frames)
+        {
+            if (frames.Length == 0)
+            {
+                return;
+            }
+
+            var serialized = new SerializedObject(action);
+            SerializedProperty property = serialized.FindProperty("animation");
+            SerializedProperty frameArray = property.FindPropertyRelative("Frames");
+
+            if (frameArray.arraySize == 0)
+            {
+                WriteAnimation(property, seed, frames);
+            }
+            else
+            {
+                // Repair blank slots in an otherwise authored animation without replacing its length.
+                bool changed = false;
+                for (int i = 0; i < frameArray.arraySize && i < frames.Length; i++)
+                {
+                    SerializedProperty element = frameArray.GetArrayElementAtIndex(i);
+                    if (element.objectReferenceValue == null && frames[i] != null)
+                    {
+                        element.objectReferenceValue = frames[i];
+                        changed = true;
+                    }
+                }
+
+                if (!changed)
+                {
+                    return;
+                }
+            }
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(action);
+            AssetDatabase.SaveAssets();
+        }
+
+        private static void SeedHitEffectsIfEmpty(SuperpowerActionDefinition action, HitEffects effects)
+        {
+            var serialized = new SerializedObject(action);
+            SerializedProperty property = serialized.FindProperty("onHit");
+            bool hasSeed = effects.RootDuration > 0f || effects.StunDuration > 0f ||
+                           effects.KnockbackForce > 0f || effects.GuardBreak ||
+                           effects.ContactDamageDisabledDuration > 0f;
+            bool hasValue = property.FindPropertyRelative("RootDuration").floatValue > 0f ||
+                            property.FindPropertyRelative("StunDuration").floatValue > 0f ||
+                            property.FindPropertyRelative("KnockbackForce").floatValue > 0f ||
+                            property.FindPropertyRelative("GuardBreak").boolValue ||
+                            property.FindPropertyRelative("ContactDamageDisabledDuration").floatValue > 0f;
+            if (!hasSeed || hasValue)
+            {
+                return;
+            }
+
+            WriteHitEffects(property, effects);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(action);
+            AssetDatabase.SaveAssets();
+        }
+
+        private static SuperpowerDefinition[] EnsureSuperpowers(SuperpowerActions actions)
+        {
+            EnsureFolder(SuperpowersFolder);
 
             return new[]
             {
-                EnsureWeapon("Weapon_Sword", "sword", "Sword", "Close-range slash and a wide cleave.",
+                EnsureSuperpower("Superpower_Sword", "sword", "Sword", "Close-range slash and a wide cleave.",
                     SwordSpritePath, actions.SwordSlash, actions.SwordCleave),
-                EnsureWeapon("Weapon_Spear", "spear", "Spear", "A two-block thrust and a broad sweep.",
+                EnsureSuperpower("Superpower_Spear", "spear", "Spear", "A two-block thrust and a broad sweep.",
                     SpearSpritePath, actions.SpearThrust, actions.SpearSweep),
-                EnsureWeapon("Weapon_Bow", "bow", "Bow", "Long-range shot and a spread volley.",
+                EnsureSuperpower("Superpower_Bow", "bow", "Bow", "Long-range shot and a spread volley.",
                     BowSpritePath, actions.BowShot, actions.BowSpread),
+                EnsureSuperpower("Superpower_Superstrength", "superstrength", "Superstrength",
+                    "Fast fists, a rooting punch and an Uppercut. Higher inherent defense.",
+                    FistsSpritePath, actions.Punch, actions.Uppercut, 12f),
             };
         }
 
-        private static WeaponDefinition EnsureWeapon(
+        private static SuperpowerDefinition EnsureSuperpower(
             string fileName,
             string id,
             string displayName,
             string description,
             string spritePath,
-            WeaponActionDefinition primary,
-            WeaponActionDefinition special)
+            SuperpowerActionDefinition primary,
+            SuperpowerActionDefinition special,
+            float defense = 0f)
         {
-            string path = $"{WeaponsFolder}/{fileName}.asset";
-            var (weapon, created) = EnsureAsset<WeaponDefinition>(path);
+            string path = $"{SuperpowersFolder}/{fileName}.asset";
+            var (superpower, created) = EnsureAsset<SuperpowerDefinition>(path);
             if (created)
             {
-                var serialized = new SerializedObject(weapon);
+                var serialized = new SerializedObject(superpower);
                 serialized.FindProperty("id").stringValue = id;
                 serialized.FindProperty("displayName").stringValue = displayName;
                 serialized.FindProperty("description").stringValue = description;
                 serialized.ApplyModifiedPropertiesWithoutUndo();
-                EditorUtility.SetDirty(weapon);
+                EditorUtility.SetDirty(superpower);
                 AssetDatabase.SaveAssets();
             }
 
             // Newly required references are backfilled so older assets keep their authored values.
-            SeedReferenceIfMissing(weapon, "pickupSprite", LoadSprite(spritePath));
-            SeedReferenceIfMissing(weapon, "primaryAction", primary);
-            SeedReferenceIfMissing(weapon, "specialAction", special);
-            return weapon;
+            SeedReferenceIfMissing(superpower, "pickupSprite", LoadSprite(spritePath));
+            SeedReferenceIfMissing(superpower, "primaryAction", primary);
+            SeedReferenceIfMissing(superpower, "specialAction", special);
+            if (defense > 0f)
+            {
+                var serialized = new SerializedObject(superpower);
+                SerializedProperty defenseProp = serialized.FindProperty("defense");
+                if (defenseProp != null && Mathf.Approximately(defenseProp.floatValue, 0f))
+                {
+                    defenseProp.floatValue = defense;
+                    serialized.ApplyModifiedPropertiesWithoutUndo();
+                    EditorUtility.SetDirty(superpower);
+                    AssetDatabase.SaveAssets();
+                }
+            }
+
+            return superpower;
         }
 
-        private static void EnsureLegacyWeaponDefinition(WeaponActions actions)
+        private static void EnsureLegacySuperpowerDefinition(SuperpowerActions actions)
         {
-            var (definition, _) = EnsureAsset<WeaponDefinition>(WeaponDefinitionPath);
+            var (definition, _) = EnsureAsset<SuperpowerDefinition>(SuperpowerDefinitionPath);
             SeedReferenceIfMissing(definition, "primaryAction", actions.BowShot);
             SeedReferenceIfMissing(definition, "specialAction", actions.BowSpread);
             SeedReferenceIfMissing(definition, "pickupSprite", LoadSprite(BowSpritePath));
@@ -544,7 +913,7 @@ namespace BattleForYourSoul.EditorTools
             return definition;
         }
 
-        private static PlayerDefinition EnsurePlayerDefinition(WeaponDefinition defaultWeapon)
+        private static PlayerDefinition EnsurePlayerDefinition(SuperpowerDefinition defaultSuperpower)
         {
             var (definition, created) = EnsureAsset<PlayerDefinition>(PlayerDefinitionPath);
             if (created)
@@ -554,7 +923,24 @@ namespace BattleForYourSoul.EditorTools
             }
 
             SeedReferenceIfMissing(definition, "sprite", LoadSprite(PlayerSpritePath));
-            SeedReferenceIfMissing(definition, "startingWeapon", defaultWeapon);
+            SeedReferenceIfMissing(definition, "startingSuperpower", defaultSuperpower);
+
+            // Charge uses the same frames as a forward punch, played on the sprite child only.
+            var dashSerialized = new SerializedObject(definition);
+            SerializedProperty dashFrames = dashSerialized.FindProperty("dashAnimation").FindPropertyRelative("Frames");
+            if (dashFrames != null && dashFrames.arraySize == 0)
+            {
+                WriteAnimation(dashSerialized.FindProperty("dashAnimation"),
+                    new AnimationSeed
+                    {
+                        FramePaths = Anim("Charge", 3), FrameDuration = 0.06f,
+                        HopOffset = new Vector2(0.1f, 0.02f),
+                    },
+                    LoadFrames(Anim("Charge", 3)));
+                dashSerialized.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(definition);
+                AssetDatabase.SaveAssets();
+            }
 
             // Newer dash fields are missing from assets created before M9; backfill only values
             // that must be positive. A designer is free to author zero cooldown/grace.
@@ -598,10 +984,14 @@ namespace BattleForYourSoul.EditorTools
             UpgradeCategoryDefinition shots,
             UpgradeCategoryDefinition mobility,
             UpgradeCategoryDefinition vitality,
-            WeaponDefinition[] weapons)
+            UpgradeCategoryDefinition superpowersCategory,
+            SuperpowerDefinition[] superpowers,
+            SuperpowerActions actions,
+            int superstrengthIndex)
         {
             EnsureFolder(UpgradesFolder);
             Sprite icon = LoadSprite(UpgradeIconSpritePath);
+            SuperpowerDefinition[] strength = superpowerFilter(superpowers, superstrengthIndex);
 
             var upgrades = new[]
             {
@@ -619,26 +1009,234 @@ namespace BattleForYourSoul.EditorTools
                 EnsureUpgrade("Upgrade_IronWill", "iron-will", "Iron Will", "Gain 14 max health.", new Color32(250, 150, 180, 255), icon, vitality, UpgradeStat.MaxHealthFlat, 14f),
                 EnsureUpgrade("Upgrade_ToughSkin", "tough-skin", "Tough Skin", "Gain 12 max health.", new Color32(232, 160, 190, 255), icon, vitality, UpgradeStat.MaxHealthFlat, 12f),
 
-                // Weapon-specific placeholders: each weapon has three so a filtered choice stays full.
-                EnsureUpgrade("Upgrade_Bow_Split", "bow-split", "Split Arrow", "Fire one additional arrow.", new Color32(244, 176, 96, 255), icon, shots, UpgradeStat.ExtraProjectiles, 1f, weaponFilter(weapons,2)),
-                EnsureUpgrade("Upgrade_Bow_Ricochet", "bow-ricochet", "Ricochet", "Arrows bounce to one more target.", new Color32(252, 200, 120, 255), icon, shots, UpgradeStat.RicochetBounces, 1f, weaponFilter(weapons,2)),
-                EnsureUpgrade("Upgrade_Bow_Impact", "bow-impact", "Explosive Tip", "Hits burst in a small area.", new Color32(248, 148, 104, 255), icon, shots, UpgradeStat.ImpactRadius, 0.35f, weaponFilter(weapons,2)),
+                // Superpower-specific placeholders: each superpower has three so a filtered choice stays full.
+                EnsureUpgrade("Upgrade_Bow_Split", "bow-split", "Split Arrow", "Fire one additional arrow.", new Color32(244, 176, 96, 255), icon, shots, UpgradeStat.ExtraProjectiles, 1f, superpowerFilter(superpowers,2)),
+                EnsureUpgrade("Upgrade_Bow_Ricochet", "bow-ricochet", "Ricochet", "Arrows bounce to one more target.", new Color32(252, 200, 120, 255), icon, shots, UpgradeStat.RicochetBounces, 1f, superpowerFilter(superpowers,2)),
+                EnsureUpgrade("Upgrade_Bow_Impact", "bow-impact", "Explosive Tip", "Hits burst in a small area.", new Color32(248, 148, 104, 255), icon, shots, UpgradeStat.ImpactRadius, 0.35f, superpowerFilter(superpowers,2)),
 
-                EnsureUpgrade("Upgrade_Sword_Reach", "sword-reach", "Longer Slash", "Sword attacks reach half a block further.", new Color32(212, 172, 236, 255), icon, vitality, UpgradeStat.RangeFlat, 0.5f, weaponFilter(weapons,0)),
-                EnsureUpgrade("Upgrade_Sword_Impact", "sword-impact", "Impact Wave", "Sword hits leave a small area of impact.", new Color32(228, 144, 220, 255), icon, vitality, UpgradeStat.ImpactRadius, 0.3f, weaponFilter(weapons,0)),
-                EnsureUpgrade("Upgrade_Sword_Edge", "sword-edge", "Keen Edge", "Sword attacks deal one more damage.", new Color32(238, 196, 248, 255), icon, vitality, UpgradeStat.DamageFlat, 1f, weaponFilter(weapons,0)),
+                EnsureUpgrade("Upgrade_Sword_Reach", "sword-reach", "Longer Slash", "Sword attacks reach half a block further.", new Color32(212, 172, 236, 255), icon, vitality, UpgradeStat.RangeFlat, 0.5f, superpowerFilter(superpowers,0)),
+                EnsureUpgrade("Upgrade_Sword_Impact", "sword-impact", "Impact Wave", "Sword hits leave a small area of impact.", new Color32(228, 144, 220, 255), icon, vitality, UpgradeStat.ImpactRadius, 0.3f, superpowerFilter(superpowers,0)),
+                EnsureUpgrade("Upgrade_Sword_Edge", "sword-edge", "Keen Edge", "Sword attacks deal one more damage.", new Color32(238, 196, 248, 255), icon, vitality, UpgradeStat.DamageFlat, 1f, superpowerFilter(superpowers,0)),
 
-                EnsureUpgrade("Upgrade_Spear_Reach", "spear-reach", "Long Reach", "Spear attacks reach half a block further.", new Color32(132, 236, 176, 255), icon, mobility, UpgradeStat.RangeFlat, 0.5f, weaponFilter(weapons,1)),
-                EnsureUpgrade("Upgrade_Spear_Broadhead", "spear-broadhead", "Broadhead", "Spear attacks deal 20% more damage.", new Color32(160, 244, 196, 255), icon, mobility, UpgradeStat.DamagePercent, 20f, weaponFilter(weapons,1)),
-                EnsureUpgrade("Upgrade_Spear_Quick", "spear-quick", "Quick Thrust", "Spear attacks recover 15% faster.", new Color32(184, 248, 212, 255), icon, mobility, UpgradeStat.FireRatePercent, 15f, weaponFilter(weapons,1)),
+                EnsureUpgrade("Upgrade_Spear_Reach", "spear-reach", "Long Reach", "Spear attacks reach half a block further.", new Color32(132, 236, 176, 255), icon, mobility, UpgradeStat.RangeFlat, 0.5f, superpowerFilter(superpowers,1)),
+                EnsureUpgrade("Upgrade_Spear_Broadhead", "spear-broadhead", "Broadhead", "Spear attacks deal 20% more damage.", new Color32(160, 244, 196, 255), icon, mobility, UpgradeStat.DamagePercent, 20f, superpowerFilter(superpowers,1)),
+                EnsureUpgrade("Upgrade_Spear_Quick", "spear-quick", "Quick Thrust", "Spear attacks recover 15% faster.", new Color32(184, 248, 212, 255), icon, mobility, UpgradeStat.FireRatePercent, 15f, superpowerFilter(superpowers,1)),
+
+                // Superstrength level-up cards: repeatable, filtered to this superpower.
+                EnsureUpgrade("Upgrade_Strength", "strength", "Strength", "Punches deal one more damage.", new Color32(240, 132, 96, 255), icon, vitality, UpgradeStat.Strength, 1f, strength),
+                EnsureUpgrade("Upgrade_HeavyFists", "heavy-fists", "Heavy Fists", "Punches deal 15% more damage.", new Color32(248, 156, 104, 255), icon, vitality, UpgradeStat.DamagePercent, 15f, strength),
+                EnsureUpgrade("Upgrade_SwiftPunch", "swift-punch", "Swift Punch", "Recover 15% faster between attacks.", new Color32(252, 196, 120, 255), icon, mobility, UpgradeStat.FireRatePercent, 15f, strength),
+                EnsureUpgrade("Upgrade_CriticalChance", "critical-chance", "Critical Chance", "Gain a 10% chance to crit (max 100%).", new Color32(252, 224, 132, 255), icon, vitality, UpgradeStat.CriticalChancePercent, 10f, strength),
+                EnsureUpgrade("Upgrade_CriticalDamage", "critical-damage", "Critical Damage", "Critical hits deal 20% more damage (max +50%).", new Color32(252, 238, 164, 255), icon, vitality, UpgradeStat.CriticalDamagePercent, 20f, strength),
+                EnsureUpgrade("Upgrade_StunChance", "stun-chance", "Stun Chance", "Hits have a 20% chance to stun (max 50% for Superstrength).", new Color32(212, 236, 140, 255), icon, vitality, UpgradeStat.BonusStunChancePercent, 20f, strength),
+                EnsureUpgrade("Upgrade_Toughness", "toughness", "Toughness", "Gain 5 defense points.", new Color32(168, 206, 244, 255), icon, vitality, UpgradeStat.DefenseFlat, 5f, strength),
+                EnsureUpgrade("Upgrade_SuperstrengthVigor", "superstrength-vigor", "Vigor", "Gain 20 max health.", new Color32(244, 184, 196, 255), icon, vitality, UpgradeStat.MaxHealthFlat, 20f, strength),
+                EnsureUpgrade("Upgrade_FirmGrip", "firm-grip", "Firm Grip", "Punches knock foes back further.", new Color32(196, 220, 252, 255), icon, mobility, UpgradeStat.ChargeKnockback, 2f, strength),
+
+                // Unique Superpower-door upgrades. Each is offered once per run; form upgrades share
+                // an exclusive group so Hulk and Man of Steel can never both be taken.
+                EnsureRichUpgrade(new UpgradeSeed
+                {
+                    FileName = "Upgrade_Charge", Id = "charge", DisplayName = "Charge",
+                    Description = "Dashing through a foe damages and knocks it back.",
+                    Color = new Color32(168, 236, 224, 255), Icon = icon, Category = superpowersCategory,
+                    SuperpowerFilter = strength, MaxStacks = 1,
+                    Modifiers = new[]
+                    {
+                        new StatModifier(UpgradeStat.ChargeDamage, 2f),
+                        new StatModifier(UpgradeStat.ChargeKnockback, 3f),
+                    },
+                    Behavior = SuperpowerUpgradeBehavior.Charge,
+                }),
+                EnsureRichUpgrade(new UpgradeSeed
+                {
+                    FileName = "Upgrade_SuperCharge", Id = "super-charge", DisplayName = "Super Charge",
+                    Description = "Hold Dash up to 2s to charge up to double damage; release to fire. A tap matches Charge.",
+                    Color = new Color32(128, 244, 236, 255), Icon = icon, Category = superpowersCategory,
+                    SuperpowerFilter = strength, MaxStacks = 1,
+                    Modifiers = new[] { new StatModifier(UpgradeStat.SuperCharge, 2f) },
+                    Behavior = SuperpowerUpgradeBehavior.SuperCharge,
+                    Requires = new[] { UpgradeAsset("Upgrade_Charge") },
+                }),
+                EnsureRichUpgrade(new UpgradeSeed
+                {
+                    FileName = "Upgrade_PowerUp", Id = "power-up", DisplayName = "Power-up",
+                    Description = "All damage increased by 20%.",
+                    Color = new Color32(248, 132, 112, 255), Icon = icon, Category = superpowersCategory,
+                    SuperpowerFilter = strength, MaxStacks = 1,
+                    Modifiers = new[] { new StatModifier(UpgradeStat.DamagePercent, 20f) },
+                    Behavior = SuperpowerUpgradeBehavior.PowerUp,
+                }),
+                EnsureRichUpgrade(new UpgradeSeed
+                {
+                    FileName = "Upgrade_Hulk", Id = "hulk", DisplayName = "Hulk",
+                    Description = "Lower health grows stronger and greener. Exclusive with Man of Steel.",
+                    Color = new Color32(112, 220, 120, 255), Icon = icon, Category = superpowersCategory,
+                    SuperpowerFilter = strength, MaxStacks = 1, ExclusiveGroup = "superstrength-form",
+                    Modifiers = new[]
+                    {
+                        new StatModifier(UpgradeStat.MaxHealthFlat, 20f),
+                        new StatModifier(UpgradeStat.DefenseFlat, 20f),
+                    },
+                    Behavior = SuperpowerUpgradeBehavior.Hulk,
+                }),
+                EnsureRichUpgrade(new UpgradeSeed
+                {
+                    FileName = "Upgrade_ManOfSteel", Id = "man-of-steel", DisplayName = "Man of Steel",
+                    Description = "Lower health grows denser and steelier. Exclusive with Hulk.",
+                    Color = new Color32(184, 204, 228, 255), Icon = icon, Category = superpowersCategory,
+                    SuperpowerFilter = strength, MaxStacks = 1, ExclusiveGroup = "superstrength-form",
+                    Modifiers = new[] { new StatModifier(UpgradeStat.DefenseFlat, 30f) },
+                    Behavior = SuperpowerUpgradeBehavior.ManOfSteel,
+                }),
+                EnsureRichUpgrade(new UpgradeSeed
+                {
+                    FileName = "Upgrade_NorthernStar", Id = "northern-star-strike", DisplayName = "Northern Star Strike",
+                    Description = "Primary becomes a 3-hit combo. Each hit deals full damage; cooldown doubles with the animation.",
+                    Color = new Color32(180, 224, 252, 255), Icon = icon, Category = superpowersCategory,
+                    SuperpowerFilter = strength, MaxStacks = 1,
+                    PrimaryOverride = actions.NorthernStar,
+                }),
+                EnsureRichUpgrade(new UpgradeSeed
+                {
+                    FileName = "Upgrade_BodySlam", Id = "body-slam", DisplayName = "Body Slam",
+                    Description = "Uppercut becomes a leaping slam. The jump is sprite animation only.",
+                    Color = new Color32(240, 184, 132, 255), Icon = icon, Category = superpowersCategory,
+                    SuperpowerFilter = strength, MaxStacks = 1,
+                    SpecialOverride = actions.BodySlam,
+                }),
             };
 
             return upgrades;
         }
 
-        private static WeaponDefinition[] weaponFilter(WeaponDefinition[] weapons, int index)
+        private static SuperpowerDefinition[] superpowerFilter(SuperpowerDefinition[] superpowers, int index)
         {
-            return weapons != null && index < weapons.Length ? new[] { weapons[index] } : new WeaponDefinition[0];
+            return superpowers != null && index < superpowers.Length ? new[] { superpowers[index] } : new SuperpowerDefinition[0];
+        }
+
+        private static UpgradeDefinition UpgradeAsset(string fileName)
+        {
+            return AssetDatabase.LoadAssetAtPath<UpgradeDefinition>($"{UpgradesFolder}/{fileName}.asset");
+        }
+
+        private struct UpgradeSeed
+        {
+            public string FileName;
+            public string Id;
+            public string DisplayName;
+            public string Description;
+            public Color32 Color;
+            public Sprite Icon;
+            public UpgradeCategoryDefinition Category;
+            public SuperpowerDefinition[] SuperpowerFilter;
+            public StatModifier[] Modifiers;
+            public SuperpowerUpgradeBehavior Behavior;
+            public int MaxStacks;
+            public string ExclusiveGroup;
+            public UpgradeDefinition[] Requires;
+            public SuperpowerActionDefinition PrimaryOverride;
+            public SuperpowerActionDefinition SpecialOverride;
+        }
+
+        private static UpgradeDefinition EnsureRichUpgrade(UpgradeSeed seed)
+        {
+            string path = $"{UpgradesFolder}/{seed.FileName}.asset";
+            var (upgrade, created) = EnsureAsset<UpgradeDefinition>(path);
+
+            SeedReferenceIfMissing(upgrade, "category", seed.Category);
+            if (!created)
+            {
+                // Stale generated assets can predate uniqueness, prerequisites, overrides or effect
+                // metadata. Backfill only empty/default fields; authored non-default values win.
+                var backfill = new SerializedObject(upgrade);
+                SeedStringIfEmpty(backfill.FindProperty("id"), seed.Id);
+                SeedStringIfEmpty(backfill.FindProperty("displayName"), seed.DisplayName);
+                SeedStringIfEmpty(backfill.FindProperty("description"), seed.Description);
+                SeedStringIfEmpty(backfill.FindProperty("exclusiveGroup"), seed.ExclusiveGroup);
+
+                SerializedProperty maxStacks = backfill.FindProperty("maxStacks");
+                if (maxStacks.intValue == 0 && seed.MaxStacks != 0)
+                {
+                    maxStacks.intValue = seed.MaxStacks;
+                }
+
+                SerializedProperty behavior = backfill.FindProperty("behavior");
+                if (behavior.intValue == 0 && seed.Behavior != 0)
+                {
+                    behavior.intValue = (int)seed.Behavior;
+                }
+
+                SerializedProperty filter = backfill.FindProperty("superpowerFilter");
+                if (filter.arraySize == 0 && seed.SuperpowerFilter != null && seed.SuperpowerFilter.Length > 0)
+                {
+                    SetObjectArray(filter, seed.SuperpowerFilter);
+                }
+
+                SerializedProperty requires = backfill.FindProperty("requires");
+                if (requires.arraySize == 0 && seed.Requires != null && seed.Requires.Length > 0)
+                {
+                    SetObjectArray(requires, seed.Requires);
+                }
+
+                SeedReferenceIfMissing(backfill.FindProperty("primaryOverride"), seed.PrimaryOverride);
+                SeedReferenceIfMissing(backfill.FindProperty("specialOverride"), seed.SpecialOverride);
+
+                SerializedProperty backfillModifiers = backfill.FindProperty("modifiers");
+                if (backfillModifiers.arraySize == 0 && seed.Modifiers != null && seed.Modifiers.Length > 0)
+                {
+                    backfillModifiers.arraySize = seed.Modifiers.Length;
+                    for (int i = 0; i < backfillModifiers.arraySize; i++)
+                    {
+                        SerializedProperty element = backfillModifiers.GetArrayElementAtIndex(i);
+                        element.FindPropertyRelative("stat").enumValueIndex = (int)seed.Modifiers[i].Stat;
+                        element.FindPropertyRelative("value").floatValue = seed.Modifiers[i].Value;
+                    }
+                }
+
+                backfill.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(upgrade);
+                AssetDatabase.SaveAssets();
+                return upgrade;
+            }
+
+            var serialized = new SerializedObject(upgrade);
+            serialized.FindProperty("id").stringValue = seed.Id;
+            serialized.FindProperty("displayName").stringValue = seed.DisplayName;
+            serialized.FindProperty("description").stringValue = seed.Description;
+            serialized.FindProperty("color").colorValue = seed.Color;
+            serialized.FindProperty("icon").objectReferenceValue = seed.Icon;
+            serialized.FindProperty("maxStacks").intValue = seed.MaxStacks;
+            serialized.FindProperty("exclusiveGroup").stringValue = seed.ExclusiveGroup ?? "";
+            serialized.FindProperty("behavior").intValue = (int)seed.Behavior;
+
+            SerializedProperty modifiers = serialized.FindProperty("modifiers");
+            modifiers.arraySize = seed.Modifiers != null ? seed.Modifiers.Length : 0;
+            for (int i = 0; i < modifiers.arraySize; i++)
+            {
+                SerializedProperty element = modifiers.GetArrayElementAtIndex(i);
+                element.FindPropertyRelative("stat").enumValueIndex = (int)seed.Modifiers[i].Stat;
+                element.FindPropertyRelative("value").floatValue = seed.Modifiers[i].Value;
+            }
+
+            SetObjectArray(serialized.FindProperty("superpowerFilter"), seed.SuperpowerFilter ?? new SuperpowerDefinition[0]);
+            SetObjectArray(serialized.FindProperty("requires"), seed.Requires ?? new UpgradeDefinition[0]);
+            serialized.FindProperty("primaryOverride").objectReferenceValue = seed.PrimaryOverride;
+            serialized.FindProperty("specialOverride").objectReferenceValue = seed.SpecialOverride;
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(upgrade);
+            AssetDatabase.SaveAssets();
+            return upgrade;
+        }
+
+        private static void SetObjectArray(SerializedProperty property, Object[] values)
+        {
+            property.arraySize = values.Length;
+            for (int i = 0; i < values.Length; i++)
+            {
+                property.GetArrayElementAtIndex(i).objectReferenceValue = values[i];
+            }
         }
 
         private static UpgradeDefinition EnsureUpgrade(
@@ -665,7 +1263,7 @@ namespace BattleForYourSoul.EditorTools
             UpgradeCategoryDefinition category,
             UpgradeStat stat,
             float value,
-            WeaponDefinition[] weaponFilter)
+            SuperpowerDefinition[] superpowerFilter)
         {
             string path = $"{UpgradesFolder}/{fileName}.asset";
             var (upgrade, created) = EnsureAsset<UpgradeDefinition>(path);
@@ -675,9 +1273,9 @@ namespace BattleForYourSoul.EditorTools
 
             if (!created)
             {
-                if (weaponFilter != null && weaponFilter.Length > 0)
+                if (superpowerFilter != null && superpowerFilter.Length > 0)
                 {
-                    SeedArrayIfEmpty(upgrade, "weaponFilter", weaponFilter);
+                    SeedArrayIfEmpty(upgrade, "superpowerFilter", superpowerFilter);
                 }
 
                 return upgrade;
@@ -696,7 +1294,9 @@ namespace BattleForYourSoul.EditorTools
             element.FindPropertyRelative("stat").enumValueIndex = (int)stat;
             element.FindPropertyRelative("value").floatValue = value;
 
-            SetSerializedArray(upgrade, "weaponFilter", weaponFilter ?? new WeaponDefinition[0]);
+            // Use the SerializedObject already open: a separate SerializedObject here would be
+            // overwritten when the pending modifiers above are applied.
+            SetObjectArray(serialized.FindProperty("superpowerFilter"), superpowerFilter ?? new SuperpowerDefinition[0]);
 
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(upgrade);
@@ -754,7 +1354,8 @@ namespace BattleForYourSoul.EditorTools
 
             return new[]
             {
-                EnsureStage("Stage_Samsara", "Samsara", 1, enemy, new Vector2[0], true, new[] { 1 }),
+                // Samsara enables every exit; there is no Superpowers door, only the three categories.
+                EnsureStage("Stage_Samsara", "Samsara", 1, enemy, new Vector2[0], true, null),
                 EnsureStage("Stage_01", "Stage 1", 1, enemy, stageOne),
                 EnsureStage("Stage_02", "Stage 2", 2, enemy, stageTwo),
                 EnsureStage("Stage_03", "Stage 3", 3, enemy, stageThree),
@@ -767,7 +1368,7 @@ namespace BattleForYourSoul.EditorTools
             int monsterLevel,
             EnemyDefinition enemy,
             Vector2[] positions,
-            bool weaponSelectionStage = false,
+            bool superpowerSelectionStage = false,
             int[] activeDoorIndices = null)
         {
             string path = $"{StagesFolder}/{fileName}.asset";
@@ -779,7 +1380,7 @@ namespace BattleForYourSoul.EditorTools
             {
                 serialized.FindProperty("displayName").stringValue = displayName;
                 serialized.FindProperty("monsterLevel").intValue = monsterLevel;
-                serialized.FindProperty("weaponSelectionStage").boolValue = weaponSelectionStage;
+                serialized.FindProperty("superpowerSelectionStage").boolValue = superpowerSelectionStage;
                 if (activeDoorIndices != null)
                 {
                     var indices = serialized.FindProperty("activeDoorIndices");
@@ -793,10 +1394,22 @@ namespace BattleForYourSoul.EditorTools
                 dirty = true;
             }
 
+            // Older Samsara assets only enabled the second exit; open all four so the Superpowers
+            // category is actually reachable. Other stages keep their authored door selection.
+            if (!created && superpowerSelectionStage)
+            {
+                SerializedProperty indices = serialized.FindProperty("activeDoorIndices");
+                if (indices != null && indices.arraySize == 1 && indices.GetArrayElementAtIndex(0).intValue == 1)
+                {
+                    indices.arraySize = 0;
+                    dirty = true;
+                }
+            }
+
             // Older stages used timed waves; backfill their fixed encounter when it is still empty.
             // Samsara deliberately stays empty, so it must never receive default enemies.
             SerializedProperty placements = serialized.FindProperty("enemyPlacements");
-            if (!weaponSelectionStage && placements != null && placements.arraySize == 0)
+            if (!superpowerSelectionStage && placements != null && placements.arraySize == 0)
             {
                 placements.arraySize = positions.Length;
                 for (int i = 0; i < positions.Length; i++)
@@ -871,7 +1484,7 @@ namespace BattleForYourSoul.EditorTools
             }
 
             // AssetDatabase.CreateFolder needs an existing parent, so create ancestors first. This
-            // matters for nested authoring folders such as Weapons/Actions.
+            // matters for nested authoring folders such as Superpowers/Actions.
             string parent = System.IO.Path.GetDirectoryName(path)!.Replace('\\', '/');
             if (!AssetDatabase.IsValidFolder(parent))
             {
@@ -887,15 +1500,33 @@ namespace BattleForYourSoul.EditorTools
         /// </summary>
         private static void EnsurePlaceholderSprites()
         {
-            if (LoadSprite(PlayerSpritePath) == null ||
-                LoadSprite(EnemySpritePath) == null ||
-                LoadSprite(ProjectileSpritePath) == null ||
-                LoadSprite(SwordSpritePath) == null ||
-                LoadSprite(SpearSpritePath) == null ||
-                LoadSprite(BowSpritePath) == null ||
-                LoadSprite(ArrowSpritePath) == null ||
-                LoadSprite(SlashVfxSpritePath) == null ||
-                LoadSprite(ThrustVfxSpritePath) == null)
+            bool missing = LoadSprite(PlayerSpritePath) == null ||
+                           LoadSprite(EnemySpritePath) == null ||
+                           LoadSprite(ProjectileSpritePath) == null ||
+                           LoadSprite(SwordSpritePath) == null ||
+                           LoadSprite(SpearSpritePath) == null ||
+                           LoadSprite(BowSpritePath) == null ||
+                           LoadSprite(FistsSpritePath) == null ||
+                           LoadSprite(ArrowSpritePath) == null ||
+                           LoadSprite(SlashVfxSpritePath) == null ||
+                           LoadSprite(ThrustVfxSpritePath) == null;
+
+            // Check every authored pose, not just Punch: a single missing frame would otherwise leave
+            // Uppercut / Northern Star / Body Slam / dash animations with a blank slot.
+            if (!missing)
+            {
+                string[] frames = RequiredAnimationPaths();
+                for (int i = 0; i < frames.Length; i++)
+                {
+                    if (LoadSprite(frames[i]) == null)
+                    {
+                        missing = true;
+                        break;
+                    }
+                }
+            }
+
+            if (missing)
             {
                 PlaceholderArtGenerator.GenerateAll();
             }
@@ -1003,13 +1634,13 @@ namespace BattleForYourSoul.EditorTools
             collider.size = size;
         }
 
-        private static (EnemySpawner, WeaponSelection) BuildCombat(
+        private static (EnemySpawner, SuperpowerSelection) BuildCombat(
             GameObject player,
             EnemyDefinition enemyDefinition,
             GameObject enemyPrefab,
             GameObject projectilePrefab,
             GameObject attackVfxPrefab,
-            WeaponDefinition[] weapons,
+            SuperpowerDefinition[] superpowers,
             GameSettings settings)
         {
             var registryGo = new GameObject("Enemy Registry");
@@ -1027,33 +1658,37 @@ namespace BattleForYourSoul.EditorTools
             SetSerializedReference(dash, "enemyRegistry", registry);
             SetSerializedReference(dash, "health", player.GetComponent<Health>());
 
-            var input = player.AddComponent<WeaponInputReader>();
-            var weapon = player.AddComponent<WeaponController>();
-            SetSerializedReference(weapon, "projectilePrefab", projectilePrefab.GetComponent<Projectile>());
-            SetSerializedReference(weapon, "attackVfxPrefab", attackVfxPrefab.GetComponent<AttackVfx>());
-            SetSerializedReference(weapon, "weaponInput", input);
-            SetSerializedReference(weapon, "movement", player.GetComponent<PlayerMovement>());
-            SetSerializedInt(weapon, "enemyMask", LayerMask.GetMask("Enemy"));
+            var input = player.AddComponent<SuperpowerInputReader>();
+            var superpower = player.AddComponent<SuperpowerController>();
+            SetSerializedReference(superpower, "projectilePrefab", projectilePrefab.GetComponent<Projectile>());
+            SetSerializedReference(superpower, "attackVfxPrefab", attackVfxPrefab.GetComponent<AttackVfx>());
+            SetSerializedReference(superpower, "superpowerInput", input);
+            SetSerializedReference(superpower, "movement", player.GetComponent<PlayerMovement>());
+            SetSerializedReference(superpower, "attackMove", player.GetComponent<AttackMovement>());
+            SetSerializedInt(superpower, "enemyMask", LayerMask.GetMask("Enemy"));
+            SetSerializedReference(superpower, "health", player.GetComponent<Health>());
+            SetSerializedReference(superpower, "bodyCollider", player.GetComponent<Collider2D>());
+            SetSerializedReference(superpower, "enemyRegistry", registry);
 
-            var selectionGo = new GameObject("Weapon Selection");
-            var selection = selectionGo.AddComponent<WeaponSelection>();
-            SetSerializedArray(selection, "weapons", weapons ?? new WeaponDefinition[0]);
-            SetSerializedReference(selection, "controller", weapon);
+            var selectionGo = new GameObject("Superpower Selection");
+            var selection = selectionGo.AddComponent<SuperpowerSelection>();
+            SetSerializedArray(selection, "superpowers", superpowers ?? new SuperpowerDefinition[0]);
+            SetSerializedReference(selection, "controller", superpower);
 
-            var pickupsRoot = new GameObject("Weapon Pickups");
+            var pickupsRoot = new GameObject("Superpower Pickups");
             SetSerializedReference(selection, "pickupsRoot", pickupsRoot);
-            BuildWeaponPickups(pickupsRoot.transform, settings, weapons, selection);
+            BuildSuperpowerPickups(pickupsRoot.transform, settings, superpowers, selection);
 
             return (spawner, selection);
         }
 
-        private static void BuildWeaponPickups(
+        private static void BuildSuperpowerPickups(
             Transform parent,
             GameSettings settings,
-            WeaponDefinition[] weapons,
-            WeaponSelection selection)
+            SuperpowerDefinition[] superpowers,
+            SuperpowerSelection selection)
         {
-            if (weapons == null || weapons.Length == 0)
+            if (superpowers == null || superpowers.Length == 0)
             {
                 return;
             }
@@ -1063,37 +1698,38 @@ namespace BattleForYourSoul.EditorTools
                 PlaceholderArtGenerator.GenerateAll();
             }
 
-            IReadOnlyList<Vector2> authored = settings != null ? settings.WeaponPedestalPositions : null;
+            IReadOnlyList<Vector2> authored = settings != null ? settings.SuperpowerPedestalPositions : null;
             int count = authored != null ? authored.Count : 0;
-            if (count < weapons.Length)
+            if (count < superpowers.Length)
             {
-                Debug.LogWarning("[GameSceneBuilder] GameSettings has fewer weapon positions than weapons; using fallback positions.");
+                Debug.LogWarning("[GameSceneBuilder] GameSettings has fewer superpower positions than superpowers; using fallback positions.");
                 authored = new[]
                 {
-                    new Vector2(-4f, -1.2f),
-                    new Vector2(0f, -1.8f),
-                    new Vector2(4f, -1.2f),
+                    new Vector2(-5.2f, -1f),
+                    new Vector2(-1.8f, -1.8f),
+                    new Vector2(1.8f, -1.8f),
+                    new Vector2(5.2f, -1f),
                 };
                 count = authored.Count;
             }
 
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            for (int i = 0; i < weapons.Length; i++)
+            for (int i = 0; i < superpowers.Length; i++)
             {
-                WeaponDefinition weapon = weapons[i];
-                if (weapon == null)
+                SuperpowerDefinition superpower = superpowers[i];
+                if (superpower == null)
                 {
                     continue;
                 }
 
                 Vector2 position = authored[i % count];
-                var pickupGo = new GameObject($"Weapon_Pickup_{weapon.DisplayName}");
+                var pickupGo = new GameObject($"Superpower_Pickup_{superpower.DisplayName}");
                 pickupGo.transform.SetParent(parent, false);
                 pickupGo.transform.position = new Vector3(position.x, position.y, 0f);
                 pickupGo.layer = LayerMask.NameToLayer("Pickup");
 
                 var spriteRenderer = pickupGo.AddComponent<SpriteRenderer>();
-                spriteRenderer.sprite = weapon.PickupSprite;
+                spriteRenderer.sprite = superpower.PickupSprite;
                 spriteRenderer.sortingLayerName = settings != null ? settings.EntitySortingLayer : "Entities";
                 pickupGo.AddComponent<IsometricSpriteSorter>();
 
@@ -1107,7 +1743,7 @@ namespace BattleForYourSoul.EditorTools
                 label.characterSize = 0.05f;
                 label.anchor = TextAnchor.LowerCenter;
                 label.alignment = TextAlignment.Center;
-                label.text = weapon.DisplayName.ToUpperInvariant();
+                label.text = superpower.DisplayName.ToUpperInvariant();
                 label.color = new Color32(236, 226, 176, 255);
 
                 var labelRenderer = labelGo.GetComponent<MeshRenderer>();
@@ -1120,8 +1756,8 @@ namespace BattleForYourSoul.EditorTools
                 trigger.size = new Vector2(0.8f, 0.8f);
                 trigger.offset = new Vector2(0f, 0.4f);
 
-                var pickup = pickupGo.AddComponent<WeaponPickup>();
-                SetSerializedReference(pickup, "weapon", weapon);
+                var pickup = pickupGo.AddComponent<SuperpowerPickup>();
+                SetSerializedReference(pickup, "superpower", superpower);
                 SetSerializedReference(pickup, "spriteRenderer", spriteRenderer);
                 SetSerializedReference(pickup, "label", label);
                 SetSerializedReference(pickup, "trigger", trigger);
@@ -1135,7 +1771,8 @@ namespace BattleForYourSoul.EditorTools
             MonsterScaling scaling,
             ProgressionDefinition progression,
             StageProgression stageProgression,
-            PlayerDefinition playerDefinition)
+            PlayerDefinition playerDefinition,
+            SuperpowerSelection selection)
         {
             var experience = player.AddComponent<Experience>();
             SetSerializedReference(experience, "progression", progression);
@@ -1143,9 +1780,29 @@ namespace BattleForYourSoul.EditorTools
             var stats = player.AddComponent<PlayerStats>();
             SetSerializedReference(stats, "definition", playerDefinition);
             SetSerializedReference(stats, "health", player.GetComponent<Health>());
-            SetSerializedReference(stats, "weapon", player.GetComponent<WeaponController>());
+            SetSerializedReference(stats, "superpower", player.GetComponent<SuperpowerController>());
             SetSerializedReference(stats, "movement", player.GetComponent<PlayerMovement>());
             SetSerializedReference(stats, "dash", player.GetComponent<PlayerDash>());
+            SetSerializedReference(stats, "superpowerSelection", selection);
+            SetSerializedReference(stats, "runUpgrades", player.GetComponent<RunUpgradeState>());
+
+            var dash = player.GetComponent<PlayerDash>();
+            SetSerializedReference(dash, "stats", stats);
+            SetSerializedReference(dash, "superpowers", player.GetComponent<SuperpowerController>());
+            SetSerializedReference(dash, "posePlayer", player.GetComponent<SuperpowerPosePlayer>());
+
+            var superpowerController = player.GetComponent<SuperpowerController>();
+            SetSerializedReference(superpowerController, "playerStats", stats);
+            SetSerializedReference(superpowerController, "posePlayer", player.GetComponent<SuperpowerPosePlayer>());
+
+            // PlayerVisuals lives on the prefab, so its runtime stats/health references can only be
+            // wired on the scene instance once those components have been added.
+            var visuals = player.GetComponent<PlayerVisuals>();
+            // Visual child, never the root: the root only owns physics and colliders.
+            SetSerializedReference(visuals, "spriteRenderer", player.GetComponentInChildren<SpriteRenderer>(true));
+            SetSerializedReference(visuals, "movement", player.GetComponent<PlayerMovement>());
+            SetSerializedReference(visuals, "stats", stats);
+            SetSerializedReference(visuals, "health", player.GetComponent<Health>());
 
             // The stage owns the monster level and feeds it to the spawner; the director listens to
             // room-clear events and owns door/advance state. Remaining references are wired once the
@@ -1167,7 +1824,7 @@ namespace BattleForYourSoul.EditorTools
         private static StageDoor[] BuildDoors(
             Transform parent,
             GameSettings settings,
-            (UpgradeCategoryDefinition shots, UpgradeCategoryDefinition mobility, UpgradeCategoryDefinition vitality) categories,
+            (UpgradeCategoryDefinition shots, UpgradeCategoryDefinition mobility, UpgradeCategoryDefinition vitality, UpgradeCategoryDefinition superpowers) categories,
             LevelDirector director)
         {
             Sprite closedSprite = LoadSprite(DoorClosedSpritePath);
@@ -1179,6 +1836,7 @@ namespace BattleForYourSoul.EditorTools
                 openSprite = LoadSprite(DoorOpenSpritePath);
             }
 
+            // No dedicated Superpowers door: those upgrades stay in the general level-up pool.
             var offers = new[]
             {
                 categories.shots,
@@ -1258,7 +1916,7 @@ namespace BattleForYourSoul.EditorTools
         /// with Gamepad control paths are merged by the Input System into one device, so existing
         /// Player/Move, Dash and attack actions work without any touch-specific gameplay code.
         /// </summary>
-        private static GameObject BuildMobileControls(Transform canvas, Font font, WeaponController weapon)
+        private static GameObject BuildMobileControls(Transform canvas, Font font, SuperpowerController superpower)
         {
             var root = new GameObject("MobileControls", typeof(RectTransform));
             root.transform.SetParent(canvas, false);
@@ -1309,10 +1967,10 @@ namespace BattleForYourSoul.EditorTools
                 "DASH", new Vector2(-200f, 290f), new Vector2(120f, 120f), "<Gamepad>/buttonSouth");
             CreateTouchButton(
                 "PrimaryButton", root.transform, font, circle, new Color32(66, 124, 206, 235),
-                "ATK", new Vector2(-200f, 150f), new Vector2(140f, 140f), "<Gamepad>/buttonWest", weapon);
+                "ATK", new Vector2(-200f, 150f), new Vector2(140f, 140f), "<Gamepad>/buttonWest", superpower);
             CreateTouchButton(
                 "SecondaryButton", root.transform, font, circle, new Color32(146, 92, 196, 235),
-                "ALT", new Vector2(-370f, 150f), new Vector2(120f, 120f), "<Gamepad>/buttonNorth", weapon);
+                "ALT", new Vector2(-370f, 150f), new Vector2(120f, 120f), "<Gamepad>/buttonNorth", superpower);
 
             root.SetActive(false);
             return root;
@@ -1328,7 +1986,7 @@ namespace BattleForYourSoul.EditorTools
             Vector2 anchoredPosition,
             Vector2 size,
             string controlPath,
-            WeaponController weapon = null)
+            SuperpowerController superpower = null)
         {
             Image image = CreateImage(name, parent, color, circle);
             PlaceAtAnchor(image.rectTransform, new Vector2(1f, 0f), anchoredPosition, size);
@@ -1345,10 +2003,10 @@ namespace BattleForYourSoul.EditorTools
             text.fontSize = 26;
             text.color = Color.white;
 
-            if (weapon != null)
+            if (superpower != null)
             {
                 var cooldown = image.gameObject.AddComponent<AttackButtonCooldown>();
-                SetSerializedReference(cooldown, "weapon", weapon);
+                SetSerializedReference(cooldown, "superpower", superpower);
                 SetSerializedReference(cooldown, "button", onScreenButton);
                 SetSerializedReference(cooldown, "image", image);
                 SetSerializedReference(cooldown, "label", text);
@@ -1372,7 +2030,7 @@ namespace BattleForYourSoul.EditorTools
             Experience experience,
             LevelDirector levelDirector,
             UpgradePool upgradePool,
-            WeaponSelection selection)
+            SuperpowerSelection selection)
         {
             var canvasGo = new GameObject("HUD", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = canvasGo.GetComponent<Canvas>();
@@ -1402,7 +2060,7 @@ namespace BattleForYourSoul.EditorTools
             GameObject mobileControls = BuildMobileControls(
                 safeAreaGo.transform,
                 font,
-                player.GetComponent<WeaponController>());
+                player.GetComponent<SuperpowerController>());
 
             // Player health bar, anchored top-left.
             Image barBackground = CreateImage("HealthBar", safeAreaGo.transform, new Color32(18, 16, 26, 220));
@@ -1444,16 +2102,16 @@ namespace BattleForYourSoul.EditorTools
             killLabel.fontSize = 36;
             killLabel.color = new Color32(236, 236, 244, 255);
 
-            // Equipped weapon, under the health bar, so Samsara's choice is always visible.
-            Text weaponLabel = CreateText("WeaponLabel", safeAreaGo.transform, font, "Weapon: none", TextAnchor.UpperLeft);
-            RectTransform weaponRect = weaponLabel.rectTransform;
-            weaponRect.anchorMin = new Vector2(0f, 1f);
-            weaponRect.anchorMax = new Vector2(0f, 1f);
-            weaponRect.pivot = new Vector2(0f, 1f);
-            weaponRect.anchoredPosition = new Vector2(24f, -62f);
-            weaponRect.sizeDelta = new Vector2(420f, 36f);
-            weaponLabel.fontSize = 28;
-            weaponLabel.color = new Color32(238, 224, 168, 255);
+            // Equipped superpower, under the health bar, so Samsara's choice is always visible.
+            Text superpowerLabel = CreateText("SuperpowerLabel", safeAreaGo.transform, font, "Superpower: none", TextAnchor.UpperLeft);
+            RectTransform superpowerRect = superpowerLabel.rectTransform;
+            superpowerRect.anchorMin = new Vector2(0f, 1f);
+            superpowerRect.anchorMax = new Vector2(0f, 1f);
+            superpowerRect.pivot = new Vector2(0f, 1f);
+            superpowerRect.anchoredPosition = new Vector2(24f, -62f);
+            superpowerRect.sizeDelta = new Vector2(420f, 36f);
+            superpowerLabel.fontSize = 28;
+            superpowerLabel.color = new Color32(238, 224, 168, 255);
 
             // Stage indicator, centered at the top so it reads separately from kills and health.
             Text stageLabel = CreateText("StageLabel", safeAreaGo.transform, font, "Samsara", TextAnchor.UpperCenter);
@@ -1576,8 +2234,8 @@ namespace BattleForYourSoul.EditorTools
             SetSerializedReference(hud, "levelDirector", levelDirector);
             SetSerializedReference(hud, "stageLabel", stageLabel);
             SetSerializedReference(hud, "objectiveLabel", objectiveLabel);
-            SetSerializedReference(hud, "weaponLabel", weaponLabel);
-            SetSerializedReference(hud, "weaponSelection", selection);
+            SetSerializedReference(hud, "superpowerLabel", superpowerLabel);
+            SetSerializedReference(hud, "superpowerSelection", selection);
 
             var gameOver = canvasGo.AddComponent<GameOverController>();
             SetSerializedReference(gameOver, "panel", panel.gameObject);
@@ -1591,7 +2249,8 @@ namespace BattleForYourSoul.EditorTools
             SetSerializedReference(levelUp, "playerHealth", player.GetComponent<Health>());
             SetSerializedReference(levelUp, "panel", levelPanel.gameObject);
             SetSerializedReference(levelUp, "pool", upgradePool);
-            SetSerializedReference(levelUp, "weaponSelection", selection);
+            SetSerializedReference(levelUp, "superpowerSelection", selection);
+            SetSerializedReference(levelUp, "runUpgrades", player.GetComponent<RunUpgradeState>());
             SetSerializedReference(levelUp, "titleLabel", levelTitle);
             SetSerializedReference(levelUp, "hintLabel", levelHint);
             SetSerializedArray(levelUp, "cards", cards);
@@ -1798,14 +2457,20 @@ namespace BattleForYourSoul.EditorTools
             GameObject player,
             CameraFollow cameraFollow,
             LevelUpController levelUp,
+            Experience experience,
             StageDoor[] doors,
-            WeaponSelection selection)
+            SuperpowerSelection selection,
+            RunUpgradeState runUpgrades,
+            PlayerStats playerStats)
         {
             SetSerializedReference(director, "settings", settings);
             SetSerializedReference(director, "playerMovement", player.GetComponent<PlayerMovement>());
             SetSerializedReference(director, "cameraFollow", cameraFollow);
             SetSerializedReference(director, "levelUpController", levelUp);
-            SetSerializedReference(director, "weaponSelection", selection);
+            SetSerializedReference(director, "experience", experience);
+            SetSerializedReference(director, "superpowerSelection", selection);
+            SetSerializedReference(director, "runUpgrades", runUpgrades);
+            SetSerializedReference(director, "playerStats", playerStats);
             SetSerializedArray(director, "doors", doors);
         }
 
@@ -1936,12 +2601,32 @@ namespace BattleForYourSoul.EditorTools
             AssetDatabase.SaveAssets();
         }
 
+        /// <summary>Reference backfill for a property on a SerializedObject that is already open.</summary>
+        private static void SeedReferenceIfMissing(SerializedProperty property, Object value)
+        {
+            if (property != null && property.objectReferenceValue == null && value != null)
+            {
+                property.objectReferenceValue = value;
+            }
+        }
+
+        /// <summary>String backfill that leaves designer-authored text untouched.</summary>
+        private static void SeedStringIfEmpty(SerializedProperty property, string value)
+        {
+            if (property == null || string.IsNullOrEmpty(value) || !string.IsNullOrEmpty(property.stringValue))
+            {
+                return;
+            }
+
+            property.stringValue = value;
+        }
+
         /// <summary>
         /// Seeds the VFX fields on both new and pre-existing actions. Fields still at their initializer
         /// defaults count as unauthored, so a rebuild backfills them without clobbering tuning.
         /// </summary>
         private static void SeedHitVfxFields(
-            WeaponActionDefinition action,
+            SuperpowerActionDefinition action,
             Sprite sprite,
             Color color,
             float size,
@@ -1956,7 +2641,7 @@ namespace BattleForYourSoul.EditorTools
             SerializedProperty sweepProp = serialized.FindProperty("hitVfxSweep");
             if (spriteProp == null || colorProp == null || sizeProp == null || durationProp == null || sweepProp == null)
             {
-                Debug.LogError("[GameSceneBuilder] Missing hit-VFX property on a weapon action.");
+                Debug.LogError("[GameSceneBuilder] Missing hit-VFX property on a superpower action.");
                 return;
             }
 

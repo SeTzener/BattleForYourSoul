@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using BattleForYourSoul.Enemies;
 
 namespace BattleForYourSoul.Combat
 {
@@ -18,7 +19,7 @@ namespace BattleForYourSoul.Combat
         [Tooltip("Radius used to nudge the projectile away from its muzzle when it spawns.")]
         [SerializeField, Min(0f)] private float spawnRadius = 0.2f;
 
-        [Tooltip("Renderer the firing weapon's projectile sprite is applied to.")]
+        [Tooltip("Renderer the firing superpower's projectile sprite is applied to.")]
         [SerializeField] private SpriteRenderer spriteRenderer;
 
         private readonly List<Collider2D> _impactHits = new List<Collider2D>(16);
@@ -32,6 +33,8 @@ namespace BattleForYourSoul.Combat
         private float _remainingLife;
         private float _impactRadius;
         private int _bounces;
+        private HitEffects _effects;
+        private bool _critical;
         private bool _active;
 
         private void Awake()
@@ -49,7 +52,7 @@ namespace BattleForYourSoul.Combat
             _release = release;
         }
 
-        /// <summary>Applies the firing weapon's projectile sprite. Called before <see cref="Launch"/>.</summary>
+        /// <summary>Applies the firing superpower's projectile sprite. Called before <see cref="Launch"/>.</summary>
         public void SetSprite(Sprite sprite)
         {
             if (spriteRenderer != null && sprite != null)
@@ -60,7 +63,7 @@ namespace BattleForYourSoul.Combat
 
         public void Launch(Vector2 origin, Vector2 direction, float speed, float damage, float lifetime, GameObject owner)
         {
-            Launch(origin, direction, speed, damage, lifetime, owner, 0, 0f, default);
+            Launch(origin, direction, speed, damage, lifetime, owner, 0, 0f, default, default(HitEffects), false);
         }
 
         /// <summary>
@@ -76,7 +79,9 @@ namespace BattleForYourSoul.Combat
             GameObject owner,
             int bounces,
             float impactRadius,
-            LayerMask impactMask)
+            LayerMask impactMask,
+            in HitEffects effects,
+            bool critical)
         {
             if (direction.sqrMagnitude < 0.0001f)
             {
@@ -93,6 +98,8 @@ namespace BattleForYourSoul.Combat
             _remainingLife = lifetime;
             _bounces = Mathf.Max(0, bounces);
             _impactRadius = Mathf.Max(0f, impactRadius);
+            _effects = effects;
+            _critical = critical;
             _impactFilter.useLayerMask = true;
             _impactFilter.layerMask = impactMask;
             _hitColliders.Clear();
@@ -136,7 +143,23 @@ namespace BattleForYourSoul.Combat
             if (other.TryGetComponent(out IDamageable damageable) && damageable.IsAlive)
             {
                 Vector2 direction = _body != null ? _body.linearVelocity.normalized : Vector2.up;
-                damageable.TakeDamage(new DamageInfo(_damage, transform.position, direction, _owner));
+                if (direction.sqrMagnitude < 0.0001f)
+                {
+                    direction = Vector2.up;
+                }
+
+                direction.Normalize();
+
+                float amount = _damage;
+                Enemy enemy = null;
+                if (other.TryGetComponent(out enemy) && enemy.Rank == EnemyRank.Boss && _effects.GuardBreak)
+                {
+                    // EXPERIMENT: bosses cannot be knocked back, so Guard Break pays in damage.
+                    amount *= 1.25f;
+                }
+
+                damageable.TakeDamage(new DamageInfo(amount, transform.position, direction, _owner, _effects, _critical));
+                enemy?.ApplyHitEffects(_effects, direction);
                 ApplyImpact(transform.position, damageable);
             }
 
@@ -202,7 +225,24 @@ namespace BattleForYourSoul.Combat
                 }
 
                 _hitColliders.Add(hit);
-                damageable.TakeDamage(new DamageInfo(_damage, hit.transform.position, Vector2.zero, _owner));
+
+                Vector2 direction = (Vector2)hit.transform.position - point;
+                if (direction.sqrMagnitude < 0.0001f)
+                {
+                    direction = Vector2.up;
+                }
+
+                direction.Normalize();
+
+                float amount = _damage;
+                Enemy enemy = null;
+                if (hit.TryGetComponent(out enemy) && enemy.Rank == EnemyRank.Boss && _effects.GuardBreak)
+                {
+                    amount *= 1.25f;
+                }
+
+                damageable.TakeDamage(new DamageInfo(amount, point, direction, _owner, _effects, _critical));
+                enemy?.ApplyHitEffects(_effects, direction);
             }
         }
 

@@ -1,6 +1,9 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using BattleForYourSoul.Combat;
+using BattleForYourSoul.Superpowers;
 
 namespace BattleForYourSoul.Progression
 {
@@ -26,6 +29,30 @@ namespace BattleForYourSoul.Progression
 
         // Adds a dash charge that is always ready, independent of the normal cooldown.
         InstantDashCharges,
+
+        // Superstrength stats. Percentages are whole numbers (20 = +20%).
+        Strength,
+        CriticalChancePercent,
+        CriticalDamagePercent,
+        BonusStunChancePercent,
+        DefenseFlat,
+
+        // Charge / Super Charge values. ChargeDamage is a damage amount, SuperCharge is seconds.
+        ChargeDamage,
+        ChargeKnockback,
+        SuperCharge,
+    }
+
+    /// <summary>Non-stat effects of a unique superpower upgrade.</summary>
+    [Flags]
+    public enum SuperpowerUpgradeBehavior
+    {
+        None = 0,
+        Charge = 1 << 0,
+        SuperCharge = 1 << 1,
+        PowerUp = 1 << 2,
+        Hulk = 1 << 3,
+        ManOfSteel = 1 << 4,
     }
 
     /// <summary>One additive modifier inside an upgrade, applied on top of everything before it.</summary>
@@ -67,12 +94,30 @@ namespace BattleForYourSoul.Progression
         [Tooltip("Used by door-picked clear rewards. Uncategorised upgrades stay in normal level-ups.")]
         [SerializeField] private UpgradeCategoryDefinition category;
 
-        [Header("Weapon")]
-        [Tooltip("Empty = available to every weapon. Otherwise only offered while one of these weapons is equipped.")]
-        [SerializeField] private WeaponDefinition[] weaponFilter;
+        [Header("Superpower")]
+        [Tooltip("Empty = available to every superpower. Otherwise only offered while one of these superpowers is equipped.")]
+        [SerializeField] private SuperpowerDefinition[] superpowerFilter;
+
+        [Header("Availability")]
+        [Tooltip("0 = unlimited stacking. 1 = unique per run.")]
+        [SerializeField, Min(0)] private int maxStacks;
+
+        [Tooltip("Upgrades in the same non-empty group are mutually exclusive.")]
+        [SerializeField] private string exclusiveGroup = "";
+
+        [Tooltip("These upgrades must be taken before this one can be offered.")]
+        [SerializeField] private UpgradeDefinition[] requires;
 
         [Header("Effect")]
         [SerializeField] private List<StatModifier> modifiers = new List<StatModifier>();
+
+        [SerializeField] private SuperpowerUpgradeBehavior behavior;
+
+        [Tooltip("Replaces the primary action while this superpower is equipped.")]
+        [SerializeField] private SuperpowerActionDefinition primaryOverride;
+
+        [Tooltip("Replaces the special action while this superpower is equipped.")]
+        [SerializeField] private SuperpowerActionDefinition specialOverride;
 
         public string Id => id;
         public string DisplayName => displayName;
@@ -81,19 +126,60 @@ namespace BattleForYourSoul.Progression
         public Color Color => color;
         public UpgradeCategoryDefinition Category => category;
         public IReadOnlyList<StatModifier> Modifiers => modifiers;
+        public int MaxStacks => Mathf.Max(0, maxStacks);
+        public string ExclusiveGroup => exclusiveGroup;
+        public SuperpowerUpgradeBehavior Behavior => behavior;
+        public SuperpowerActionDefinition PrimaryOverride => primaryOverride;
+        public SuperpowerActionDefinition SpecialOverride => specialOverride;
 
-        public bool AppliesTo(WeaponDefinition weapon)
+        public bool AppliesTo(SuperpowerDefinition superpower)
         {
-            if (weaponFilter == null || weaponFilter.Length == 0)
+            if (superpowerFilter == null || superpowerFilter.Length == 0)
             {
                 return true;
             }
 
-            for (int i = 0; i < weaponFilter.Length; i++)
+            for (int i = 0; i < superpowerFilter.Length; i++)
             {
-                if (weaponFilter[i] == weapon)
+                if (superpowerFilter[i] == superpower)
                 {
                     return true;
+                }
+            }
+
+            return false;
+        }
+
+        public bool RequiresMetBy(IReadOnlyCollection<string> takenIds)
+        {
+            if (requires == null)
+            {
+                return true;
+            }
+
+            for (int i = 0; i < requires.Length; i++)
+            {
+                if (requires[i] != null && !takenIds.Contains(requires[i].Id))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public bool HasOverrideFor(SuperpowerDefinition superpower)
+        {
+            if (superpowerFilter == null || superpowerFilter.Length == 0)
+            {
+                return primaryOverride != null || specialOverride != null;
+            }
+
+            for (int i = 0; i < superpowerFilter.Length; i++)
+            {
+                if (superpowerFilter[i] == superpower)
+                {
+                    return primaryOverride != null || specialOverride != null;
                 }
             }
 

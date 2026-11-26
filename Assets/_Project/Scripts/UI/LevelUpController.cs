@@ -5,7 +5,7 @@ using UnityEngine.UI;
 using BattleForYourSoul.Combat;
 using BattleForYourSoul.Player;
 using BattleForYourSoul.Progression;
-using BattleForYourSoul.Weapons;
+using BattleForYourSoul.Superpowers;
 
 namespace BattleForYourSoul.UI
 {
@@ -26,7 +26,8 @@ namespace BattleForYourSoul.UI
         [SerializeField] private GameObject panel;
         [SerializeField] private UpgradeCardView[] cards;
         [SerializeField] private UpgradePool pool;
-        [SerializeField] private WeaponSelection weaponSelection;
+        [SerializeField] private SuperpowerSelection superpowerSelection;
+        [SerializeField] private RunUpgradeState runUpgrades;
         [SerializeField] private Text titleLabel;
         [SerializeField] private Text hintLabel;
 
@@ -72,6 +73,25 @@ namespace BattleForYourSoul.UI
             {
                 playerHealth.Died -= HandlePlayerDied;
             }
+        }
+
+        /// <summary>
+        /// Clears any pending reward, closes the panel and resumes time. Called when a fresh Samsara
+        /// stage starts so a reward picked at the previous exit cannot leak into the new run.
+        /// </summary>
+        public void ResetForNewRun()
+        {
+            _queue.Clear();
+            _showing = false;
+            _dead = false;
+            ClearCards();
+
+            if (panel != null)
+            {
+                panel.SetActive(false);
+            }
+
+            Time.timeScale = 1f;
         }
 
         /// <summary>
@@ -129,8 +149,8 @@ namespace BattleForYourSoul.UI
             }
 
             UpgradeCategoryDefinition category = _queue.Dequeue();
-            WeaponDefinition weapon = weaponSelection != null ? weaponSelection.SelectedWeapon : null;
-            BuildChoices(category, weapon);
+            SuperpowerDefinition superpower = superpowerSelection != null ? superpowerSelection.SelectedSuperpower : null;
+            BuildChoices(category, superpower);
 
             if (_choices.Count == 0)
             {
@@ -187,7 +207,11 @@ namespace BattleForYourSoul.UI
 
         private void Choose(UpgradeDefinition upgrade)
         {
-            if (stats != null)
+            // Record the pick before applying it: PlayerStats pushes the resulting modifiers into the
+            // superpower controller, which reads action overrides back from this run state. A pick that
+            // became invalid (for example a form that was taken by another queued card) is rejected.
+            bool accepted = runUpgrades == null || runUpgrades.MarkTaken(upgrade);
+            if (accepted && stats != null)
             {
                 stats.Apply(upgrade);
             }
@@ -218,16 +242,16 @@ namespace BattleForYourSoul.UI
             }
         }
 
-        private void BuildChoices(UpgradeCategoryDefinition category, WeaponDefinition weapon)
+        private void BuildChoices(UpgradeCategoryDefinition category, SuperpowerDefinition superpower)
         {
             _choices.Clear();
-            Collect(category, weapon, true);
+            Collect(category, superpower, true);
 
             // A category with too few authored upgrades falls back to the rest of the pool, keeping the
-            // weapon filter so a bow never receives a sword upgrade.
+            // superpower filter so a bow never receives a sword upgrade.
             if (_choices.Count == 0 && category != null)
             {
-                Collect(null, weapon, true);
+                Collect(null, superpower, true);
             }
 
             // Last resort for an empty or misconfigured pool: offer anything rather than soft-lock.
@@ -237,7 +261,7 @@ namespace BattleForYourSoul.UI
             }
         }
 
-        private void Collect(UpgradeCategoryDefinition category, WeaponDefinition weapon, bool filterByWeapon)
+        private void Collect(UpgradeCategoryDefinition category, SuperpowerDefinition superpower, bool filterBySuperpower)
         {
             _scratch.Clear();
 
@@ -259,7 +283,14 @@ namespace BattleForYourSoul.UI
                     continue;
                 }
 
-                if (filterByWeapon && !upgrade.AppliesTo(weapon))
+                if (filterBySuperpower && !upgrade.AppliesTo(superpower))
+                {
+                    continue;
+                }
+
+                // Unique and mutually exclusive upgrades disappear once taken; prerequisites hide
+                // until their parent upgrade has been picked.
+                if (runUpgrades != null && !runUpgrades.CanOffer(upgrade))
                 {
                     continue;
                 }

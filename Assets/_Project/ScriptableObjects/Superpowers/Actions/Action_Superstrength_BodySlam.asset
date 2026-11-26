@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c338bda2c5d53490b847177192b26d14, type: 3}
+  m_Name: Action_Superstrength_BodySlam
+  m_EditorClassIdentifier: BattleForYourSoul::BattleForYourSoul.Superpowers.SuperpowerActionDefinition
+  displayName: Body Slam
+  shape: 0
+  cooldown: 1.8
+  damage: 7
+  range: 1.55
+  arcDegrees: 150
+  lineWidth: 0.4
+  hitCount: 1
+  hitDelay: 0
+  hitInterval: 0
+  sweepHitsWhileLunging: 1
+  onHit:
+    RootDuration: 0.3
+    RootAffectsSpecialFoes: 0
+    StunDuration: 0
+    KnockbackForce: 8
+    KnockbackDuration: 0.35
+    KnockbackAffectsSpecialFoes: 0
+    GuardBreak: 0
+    ContactDamageDisabledDuration: 0.5
+  animation:
+    Frames:
+    - {fileID: 21300000, guid: 01051013ad2114efdbdbadc07d49de9d, type: 3}
+    - {fileID: 21300000, guid: d2eff1db35cf040caad825ad51dae1fb, type: 3}
+    - {fileID: 21300000, guid: 69691d55e65034da1a3170bcb41bddf6, type: 3}
+    - {fileID: 21300000, guid: 8564978c8698a4a2e81370a7f79787e9, type: 3}
+    - {fileID: 21300000, guid: c49e1f747c94c4e6eb07eaa8ecc72b15, type: 3}
+    FrameDuration: 0.34
+    HopOffset: {x: 0, y: 0.7}
+    LungeDistance: 1.5
+    LungeDuration: 0.6
+  projectilesPerShot: 0
+  spreadDegrees: 0
+  projectileSpeed: 0
+  projectileLifetime: 0
+  projectileSprite: {fileID: 0}
+  hitVfxSprite: {fileID: 21300000, guid: f8067fd66290b4713a87260f1b0da899, type: 3}
+  hitVfxColor: {r: 0.9254902, g: 0.65882355, b: 0.47058824, a: 1}
+  hitVfxSize: 2.4
+  hitVfxDuration: 0.28
+  hitVfxSweep: 40

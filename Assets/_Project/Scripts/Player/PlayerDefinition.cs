@@ -1,10 +1,11 @@
 using UnityEngine;
 using BattleForYourSoul.Combat;
+using BattleForYourSoul.Superpowers;
 
 namespace BattleForYourSoul.Player
 {
     /// <summary>
-    /// Authoring-time definition of the player character: base stats, body and starting weapon.
+    /// Authoring-time definition of the player character: base stats, body and starting superpower.
     ///
     /// Immutable data only. Runtime state (current health, upgrade bonuses) lives on the scene
     /// components, so many values can share one definition and retuning the player is an asset edit
@@ -31,13 +32,16 @@ namespace BattleForYourSoul.Player
         [Tooltip("Brief damage immunity after the dash ends, so an enemy the player lands on cannot hit instantly.")]
         [SerializeField, Min(0f)] private float dashGrace = 0.08f;
 
+        [Tooltip("Placeholder frames played on the sprite child while dashing.")]
+        [SerializeField] private AttackAnimation dashAnimation;
+
         [Header("Body")]
         [SerializeField] private Vector2 colliderSize = new Vector2(0.45f, 0.5f);
         [SerializeField] private Vector2 colliderOffset = new Vector2(0f, 0.25f);
 
         [Header("Loadout")]
-        [Tooltip("Weapon the player starts the run with.")]
-        [SerializeField] private WeaponDefinition startingWeapon;
+        [Tooltip("Superpower the player starts the run with.")]
+        [SerializeField] private SuperpowerDefinition startingSuperpower;
 
         public string DisplayName => displayName;
         public Sprite Sprite => sprite;
@@ -49,8 +53,9 @@ namespace BattleForYourSoul.Player
         public float DashDuration => dashDuration;
         public float DashCooldown => dashCooldown;
         public float DashGrace => dashGrace;
+        public AttackAnimation DashAnimation => dashAnimation;
         public Vector2 ColliderSize => colliderSize;
         public Vector2 ColliderOffset => colliderOffset;
-        public WeaponDefinition StartingWeapon => startingWeapon;
+        public SuperpowerDefinition StartingSuperpower => startingSuperpower;
     }
 }

@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &9013601841047047889
+--- !u!1 &3958477461220035472
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,46 +8,39 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 6037143916344421490}
-  - component: {fileID: 1709141141359300336}
-  - component: {fileID: 1950958755109986442}
-  - component: {fileID: 7358159363649380681}
-  - component: {fileID: 4435396973374985607}
-  - component: {fileID: 2755205467151600161}
-  - component: {fileID: 1354488628004236}
-  - component: {fileID: 3483980430709426582}
-  - component: {fileID: 1010082389061867261}
-  - component: {fileID: 3882558196154676360}
+  - component: {fileID: 7104446448446122188}
+  - component: {fileID: 3025177913670057068}
+  - component: {fileID: 7786749003085709168}
   m_Layer: 8
-  m_Name: Player
-  m_TagString: Player
+  m_Name: Visual
+  m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &6037143916344421490
+--- !u!4 &7104446448446122188
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9013601841047047889}
+  m_GameObject: {fileID: 3958477461220035472}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 313368997805002557}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!212 &1709141141359300336
+--- !u!212 &3025177913670057068
 SpriteRenderer:
   serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9013601841047047889}
+  m_GameObject: {fileID: 3958477461220035472}
   m_Enabled: 1
   m_CastShadows: 0
   m_ReceiveShadows: 0
@@ -100,29 +93,71 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
   m_BlendShapeWeights: []
---- !u!114 &1950958755109986442
+--- !u!114 &7786749003085709168
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9013601841047047889}
+  m_GameObject: {fileID: 3958477461220035472}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 01daabdb9b63742b083246b8abbb4f5c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: BattleForYourSoul::BattleForYourSoul.World.IsometricSpriteSorter
-  targetRenderer: {fileID: 1709141141359300336}
+  targetRenderer: {fileID: 3025177913670057068}
   unitsPerOrderStep: 100
   orderOffset: 0
---- !u!50 &7358159363649380681
+--- !u!1 &5861269681509881003
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 313368997805002557}
+  - component: {fileID: 2249885105493909845}
+  - component: {fileID: 902070876114848356}
+  - component: {fileID: 7202992804377123944}
+  - component: {fileID: 5394359526224814205}
+  - component: {fileID: 5018453813771620711}
+  - component: {fileID: 3825289615605135988}
+  - component: {fileID: 3558623183475261260}
+  - component: {fileID: 5788346321046562795}
+  - component: {fileID: 4109962835805447262}
+  - component: {fileID: 480023380988823993}
+  m_Layer: 8
+  m_Name: Player
+  m_TagString: Player
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &313368997805002557
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5861269681509881003}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 7104446448446122188}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!50 &2249885105493909845
 Rigidbody2D:
   serializedVersion: 5
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9013601841047047889}
+  m_GameObject: {fileID: 5861269681509881003}
   m_BodyType: 0
   m_Simulated: 1
   m_UseFullKinematicContacts: 0
@@ -142,13 +177,13 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 1
   m_Constraints: 4
---- !u!70 &4435396973374985607
+--- !u!70 &902070876114848356
 CapsuleCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9013601841047047889}
+  m_GameObject: {fileID: 5861269681509881003}
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
@@ -179,13 +214,13 @@ CapsuleCollider2D:
   m_Offset: {x: 0, y: 0.25}
   m_Size: {x: 0.45, y: 0.5}
   m_Direction: 0
---- !u!114 &2755205467151600161
+--- !u!114 &7202992804377123944
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9013601841047047889}
+  m_GameObject: {fileID: 5861269681509881003}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 78562d0db879e42098a5c084f8236041, type: 3}
@@ -194,13 +229,13 @@ MonoBehaviour:
   actionsOverride: {fileID: 0}
   moveActionPath: Player/Move
   dashActionPath: Player/Dash
---- !u!114 &1354488628004236
+--- !u!114 &5394359526224814205
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9013601841047047889}
+  m_GameObject: {fileID: 5861269681509881003}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c9edfc81f9e734f0588eda38a07354c5, type: 3}
@@ -210,13 +245,26 @@ MonoBehaviour:
   moveSpeed: 5
   acceleration: 60
   deceleration: 80
---- !u!114 &3483980430709426582
+--- !u!114 &5018453813771620711
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9013601841047047889}
+  m_GameObject: {fileID: 5861269681509881003}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed81e6ecf38f84fb1916f072a076bc4f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: BattleForYourSoul::BattleForYourSoul.Player.AttackMovement
+  movement: {fileID: 0}
+--- !u!114 &3825289615605135988
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5861269681509881003}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: be7133607568142b18d3524cea0ebd19, type: 3}
@@ -230,28 +278,58 @@ MonoBehaviour:
   bodyCollider: {fileID: 0}
   enemyRegistry: {fileID: 0}
   health: {fileID: 0}
---- !u!114 &1010082389061867261
+  stats: {fileID: 0}
+  superpowers: {fileID: 0}
+  posePlayer: {fileID: 0}
+--- !u!114 &3558623183475261260
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9013601841047047889}
+  m_GameObject: {fileID: 5861269681509881003}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b580ab36dfbfd40f6bb5b1b153451b78, type: 3}
   m_Name: 
   m_EditorClassIdentifier: BattleForYourSoul::BattleForYourSoul.Player.PlayerVisuals
   definition: {fileID: 11400000, guid: 3fc7d6767e89248508a816e7571b3fbc, type: 2}
-  movement: {fileID: 1354488628004236}
-  spriteRenderer: {fileID: 1709141141359300336}
---- !u!114 &3882558196154676360
+  movement: {fileID: 5394359526224814205}
+  spriteRenderer: {fileID: 3025177913670057068}
+  stats: {fileID: 0}
+  health: {fileID: 0}
+--- !u!114 &5788346321046562795
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9013601841047047889}
+  m_GameObject: {fileID: 5861269681509881003}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c17e44cac29754cbc9cc2397b59578ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: BattleForYourSoul::BattleForYourSoul.Superpowers.SuperpowerPosePlayer
+  spriteRenderer: {fileID: 3025177913670057068}
+--- !u!114 &4109962835805447262
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5861269681509881003}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c058fc7ef091040f7892bfecf8dd153e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: BattleForYourSoul::BattleForYourSoul.Progression.RunUpgradeState
+--- !u!114 &480023380988823993
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5861269681509881003}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 10771f4ad71db4faeb25686f00381c52, type: 3}

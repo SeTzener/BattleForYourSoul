@@ -5,12 +5,9 @@ using UnityEngine.InputSystem;
 namespace BattleForYourSoul.Player
 {
     /// <summary>
-    /// Reads the Input System "Player/Move" action and exposes it as a normalised vector.
-    ///
-    /// This is the only gameplay component that touches the Input System. By default it uses the
-    /// project-wide actions asset; assign <see cref="actionsOverride"/> to point at a different
-    /// asset (useful for tests or a rebinding screen). Keyboard, gamepad and joystick bindings all
-    /// arrive here already merged by the Input System.
+    /// Reads the Input System "Player/Move" and "Player/Dash" actions and exposes them as
+    /// framework-agnostic player intent. This is the only gameplay component that touches the Input
+    /// System; keyboard, gamepad and the mobile virtual gamepad all arrive here already merged.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class PlayerInputReader : MonoBehaviour, IPlayerInput
@@ -32,7 +29,10 @@ namespace BattleForYourSoul.Player
         public Vector2 Move { get; private set; }
 
         /// <inheritdoc />
+        public bool DashHeld => _dashAction != null && _dashAction.IsPressed();
+
         public event Action DashPressed;
+        public event Action DashReleased;
 
         private void Awake()
         {
@@ -71,9 +71,17 @@ namespace BattleForYourSoul.Player
 
         private void Update()
         {
-            if (_dashAction != null && _dashAction.WasPressedThisFrame())
+            if (_dashAction != null)
             {
-                DashPressed?.Invoke();
+                if (_dashAction.WasPressedThisFrame())
+                {
+                    DashPressed?.Invoke();
+                }
+
+                if (_dashAction.WasReleasedThisFrame())
+                {
+                    DashReleased?.Invoke();
+                }
             }
 
             if (_moveAction == null)
