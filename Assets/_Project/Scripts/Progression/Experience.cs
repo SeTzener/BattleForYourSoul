@@ -38,8 +38,16 @@ namespace BattleForYourSoul.Progression
 
         private void Awake()
         {
+            ResetForNewRun();
+        }
+
+        /// <summary>Returns to the starting level without raising <see cref="LeveledUp"/>.</summary>
+        public void ResetForNewRun()
+        {
             _level = progression != null ? progression.StartingLevel : 1;
+            _xp = 0f;
             _xpToNext = XpRequiredFor(_level);
+            Changed?.Invoke(this);
         }
 
         /// <summary>Adds XP and resolves any level-ups it triggers.</summary>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace BattleForYourSoul.Combat
@@ -7,6 +8,9 @@ namespace BattleForYourSoul.Combat
     /// Runtime hit points for any actor. This is per-instance state and never lives in a definition
     /// asset. Other systems react through <see cref="Changed"/> and <see cref="Died"/> instead of
     /// polling, so nothing has to search the scene to keep a health bar in sync.
+    ///
+    /// Defense uses diminishing returns: reduction = defense / (defense + knee), capped at 80%.
+    /// See PROGRESSION.md for the formula and tuning notes.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class Health : MonoBehaviour, IDamageable
@@ -14,9 +18,14 @@ namespace BattleForYourSoul.Combat
         [Tooltip("Hit points at full health. Overwritten by a definition when one drives this actor.")]
         [SerializeField, Min(1f)] private float maxHealth = 10f;
 
+        private const float MaxReduction = 0.8f;
+
+        private readonly HashSet<object> _immunityOwners = new HashSet<object>();
+
         private float _current;
+        private float _defensePoints;
+        private float _defenseKnee = 50f;
         private bool _initialized;
-        private bool _damageImmune;
 
         public float Max => maxHealth;
 
@@ -28,11 +37,16 @@ namespace BattleForYourSoul.Combat
 
         public bool IsAlive => Current > 0f;
 
+        /// <summary>Reduction after defense, from 0 to 0.8.</summary>
+        public float DamageReduction => _defensePoints <= 0f
+            ? 0f
+            : Mathf.Min(MaxReduction, _defensePoints / (_defensePoints + Mathf.Max(1f, _defenseKnee)));
+
         /// <summary>
-        /// While set, all incoming damage is ignored. Used by short-lived effects such as a dash;
-        /// the owner is responsible for clearing it.
+        /// True while any effect (dash, moving attack, …) holds an immunity lease. Leases are
+        /// owner-keyed so overlapping effects cannot clear each other's protection.
         /// </summary>
-        public bool IsDamageImmune => _damageImmune;
+        public bool IsDamageImmune => _immunityOwners.Count > 0;
 
         /// <summary>Raised after any change to <see cref="Current"/>.</summary>
         public event Action<Health> Changed;
@@ -44,6 +58,13 @@ namespace BattleForYourSoul.Combat
         {
             _current = maxHealth;
             _initialized = true;
+        }
+
+        /// <summary>Sets defense points and the knee of the diminishing-returns curve.</summary>
+        public void SetDefense(float points, float knee)
+        {
+            _defensePoints = Mathf.Max(0f, points);
+            _defenseKnee = Mathf.Max(1f, knee);
         }
 
         /// <summary>
@@ -69,12 +90,13 @@ namespace BattleForYourSoul.Combat
         /// <inheritdoc />
         public void TakeDamage(in DamageInfo damage)
         {
-            if (!IsAlive || _damageImmune || damage.Amount <= 0f)
+            if (!IsAlive || IsDamageImmune || damage.Amount <= 0f)
             {
                 return;
             }
 
-            _current = Mathf.Max(0f, Current - damage.Amount);
+            float amount = damage.Amount * (1f - DamageReduction);
+            _current = Mathf.Max(0f, Current - amount);
             _initialized = true;
             Changed?.Invoke(this);
 
@@ -84,10 +106,28 @@ namespace BattleForYourSoul.Combat
             }
         }
 
-        /// <summary>Toggles damage immunity for effects that must guarantee no damage is taken.</summary>
-        public void SetDamageImmune(bool immune)
+        /// <summary>Adds a damage-immunity lease. The same owner can add it repeatedly.</summary>
+        public void AddDamageImmunity(object owner)
         {
-            _damageImmune = immune;
+            if (owner != null)
+            {
+                _immunityOwners.Add(owner);
+            }
+        }
+
+        /// <summary>Releases one owner's damage-immunity lease, leaving any others intact.</summary>
+        public void RemoveDamageImmunity(object owner)
+        {
+            if (owner != null)
+            {
+                _immunityOwners.Remove(owner);
+            }
+        }
+
+        /// <summary>Clears every lease. Used by a full reset, not by a single effect ending.</summary>
+        public void ClearDamageImmunity()
+        {
+            _immunityOwners.Clear();
         }
 
         public void Heal(float amount)
@@ -128,7 +168,7 @@ namespace BattleForYourSoul.Combat
         {
             _current = maxHealth;
             _initialized = true;
-            _damageImmune = false;
+            _immunityOwners.Clear();
             Changed?.Invoke(this);
         }
     }

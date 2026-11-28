@@ -18,6 +18,9 @@ namespace BattleForYourSoul.Combat
 
         private float _nextDamageTime;
 
+        /// <summary>Stunned/rooted enemies stop touching the player for damage.</summary>
+        public bool IsEnabled { get; set; } = true;
+
         public void Configure(LayerMask mask, float damageAmount, float damageInterval)
         {
             targetMask = mask;
@@ -28,7 +31,7 @@ namespace BattleForYourSoul.Combat
 
         private void OnCollisionStay2D(Collision2D collision)
         {
-            if (Time.time < _nextDamageTime)
+            if (!IsEnabled || Time.time < _nextDamageTime)
             {
                 return;
             }

@@ -35,8 +35,8 @@ namespace BattleForYourSoul.Progression
         [SerializeField] private EnemyPlacement[] enemyPlacements;
 
         [Header("Room rules")]
-        [Tooltip("Marks a weapon-selection room: no enemies, pickups are active, and the exit locks the chosen weapon.")]
-        [SerializeField] private bool weaponSelectionStage;
+        [Tooltip("Marks a superpower-selection room: no enemies, pickups are active, and the exit locks the chosen superpower.")]
+        [SerializeField] private bool superpowerSelectionStage;
 
         [Tooltip("Indices of the shared door fixtures enabled in this room. Empty means all doors.")]
         [SerializeField] private int[] activeDoorIndices;
@@ -44,7 +44,7 @@ namespace BattleForYourSoul.Progression
         public string DisplayName => displayName;
         public int MonsterLevel => monsterLevel;
         public IReadOnlyList<EnemyPlacement> EnemyPlacements => enemyPlacements;
-        public bool IsWeaponSelectionStage => weaponSelectionStage;
+        public bool IsSuperpowerSelectionStage => superpowerSelectionStage;
         public IReadOnlyList<int> ActiveDoorIndices => activeDoorIndices;
     }
 }

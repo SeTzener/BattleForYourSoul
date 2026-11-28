@@ -3,6 +3,7 @@ using UnityEngine;
 using BattleForYourSoul.Combat;
 using BattleForYourSoul.Core;
 using BattleForYourSoul.Enemies;
+using BattleForYourSoul.Superpowers;
 
 namespace BattleForYourSoul.Player
 {
@@ -11,9 +12,8 @@ namespace BattleForYourSoul.Player
     ///
     /// Gameplay ownership is split on purpose: this component decides <em>when</em> a dash happens
     /// and handles enemies/immunity, <see cref="PlayerMovement"/> owns the body velocity while it
-    /// lasts. Input arrives through <see cref="IPlayerInput"/>, so nothing here touches a device.
-    /// Instant charges granted by upgrades are always ready and refill after each dash; the normal
-    /// charge still recharges on its cooldown.
+    /// lasts. With Charge taken, a dash also damages each enemy it passes through once. With Super
+    /// Charge taken, holding the button charges damage up to 2x; a tap still dashes at 1x.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(PlayerMovement))]
@@ -35,8 +35,11 @@ namespace BattleForYourSoul.Player
         [SerializeField] private Collider2D bodyCollider;
         [SerializeField] private EnemyRegistry enemyRegistry;
         [SerializeField] private Health health;
+        [SerializeField] private PlayerStats stats;
+        [SerializeField] private SuperpowerController superpowers;
+        [SerializeField] private SuperpowerPosePlayer posePlayer;
 
-        private readonly List<Collider2D> _ignoredColliders = new List<Collider2D>(8);
+        private readonly HashSet<Enemy> _dashHitEnemies = new HashSet<Enemy>();
 
         private IPlayerInput _input;
         private PlayerMovement _movement;
@@ -46,9 +49,24 @@ namespace BattleForYourSoul.Player
         private float _cooldownRemaining;
         private float _dashRemaining;
         private float _graceRemaining;
+        private float _chargeElapsed;
+        private float _dashDamage;
+        private float _dashDamageMultiplier = 1f;
+        private bool _charging;
         private bool _dashing;
 
         public bool IsDashing => _dashing;
+        public bool IsCharging => _charging;
+
+        /// <summary>Charge progress from 0 to 1, for a future HUD meter.</summary>
+        public float ChargeProgress
+        {
+            get
+            {
+                float duration = stats != null ? stats.CurrentModifiers.SuperChargeDuration : 0f;
+                return duration > 0f ? Mathf.Clamp01(_chargeElapsed / duration) : 0f;
+            }
+        }
 
         private void Awake()
         {
@@ -80,7 +98,8 @@ namespace BattleForYourSoul.Player
         {
             if (_input != null)
             {
-                _input.DashPressed += TryDash;
+                _input.DashPressed += HandleDashPressed;
+                _input.DashReleased += HandleDashReleased;
             }
         }
 
@@ -88,7 +107,8 @@ namespace BattleForYourSoul.Player
         {
             if (_input != null)
             {
-                _input.DashPressed -= TryDash;
+                _input.DashPressed -= HandleDashPressed;
+                _input.DashReleased -= HandleDashReleased;
             }
 
             Cancel();
@@ -114,8 +134,23 @@ namespace BattleForYourSoul.Player
                 }
             }
 
+            if (_charging)
+            {
+                if (Time.timeScale <= 0f)
+                {
+                    _charging = false;
+                    _chargeElapsed = 0f;
+                }
+                else if (_input != null && _input.DashHeld)
+                {
+                    float duration = Mathf.Max(0.01f, stats != null ? stats.CurrentModifiers.SuperChargeDuration : 0.01f);
+                    _chargeElapsed = Mathf.Min(duration, _chargeElapsed + Time.deltaTime);
+                }
+            }
+
             if (_dashing)
             {
+                ApplyDashHits();
                 _dashRemaining -= Time.deltaTime;
                 if (_dashRemaining <= 0f)
                 {
@@ -127,7 +162,7 @@ namespace BattleForYourSoul.Player
                 _graceRemaining -= Time.deltaTime;
                 if (_graceRemaining <= 0f && health != null)
                 {
-                    health.SetDamageImmune(false);
+                    health.RemoveDamageImmunity(this);
                 }
             }
         }
@@ -142,9 +177,39 @@ namespace BattleForYourSoul.Player
             _instantAvailable = _grantedInstantCharges;
         }
 
-        private void TryDash()
+        private void HandleDashPressed()
         {
-            // A modal (level-up/game over) freezes time; do not start a dash that cannot progress.
+            if (_dashing || Time.timeScale <= 0f || _movement == null)
+            {
+                return;
+            }
+
+            float duration = stats != null ? stats.CurrentModifiers.SuperChargeDuration : 0f;
+            if (duration > 0f)
+            {
+                _charging = true;
+                _chargeElapsed = 0f;
+                return;
+            }
+
+            TryDash(1f);
+        }
+
+        private void HandleDashReleased()
+        {
+            if (!_charging)
+            {
+                return;
+            }
+
+            _charging = false;
+            float duration = stats != null ? stats.CurrentModifiers.SuperChargeDuration : 0f;
+            float progress = duration > 0f ? Mathf.Clamp01(_chargeElapsed / duration) : 0f;
+            TryDash(Mathf.Lerp(1f, 2f, progress));
+        }
+
+        private void TryDash(float damageMultiplier)
+        {
             if (_dashing || Time.timeScale <= 0f || _movement == null)
             {
                 return;
@@ -176,12 +241,55 @@ namespace BattleForYourSoul.Player
             Vector2 facing = IsometricUtility.ScreenDirectionToWorld(_movement.Facing);
             _dashing = true;
             _dashRemaining = Mathf.Max(0.01f, dashDuration);
+            _dashDamageMultiplier = damageMultiplier;
+            _dashDamage = stats != null ? stats.CurrentModifiers.ChargeDamage : 0f;
+            _dashHitEnemies.Clear();
             _movement.BeginDash(facing, dashSpeed);
 
             IgnoreEnemyCollisions();
             if (health != null)
             {
-                health.SetDamageImmune(true);
+                health.AddDamageImmunity(this);
+            }
+
+            if (posePlayer != null && definition != null)
+            {
+                posePlayer.Play(definition.DashAnimation, facing);
+            }
+        }
+
+        private void ApplyDashHits()
+        {
+            if (_dashDamage <= 0f || superpowers == null || enemyRegistry == null)
+            {
+                return;
+            }
+
+            SuperpowerModifiers modifiers = stats != null ? stats.CurrentModifiers : SuperpowerModifiers.Default;
+            var effects = new HitEffects
+            {
+                KnockbackForce = modifiers.ChargeKnockbackForce,
+                KnockbackDuration = modifiers.ChargeKnockbackDuration,
+            };
+
+            Vector2 origin = transform.position;
+            IReadOnlyList<Enemy> enemies = enemyRegistry.Enemies;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                Enemy enemy = enemies[i];
+                if (enemy == null || !enemy.gameObject.activeInHierarchy || _dashHitEnemies.Contains(enemy))
+                {
+                    continue;
+                }
+
+                float radius = 0.65f + (enemy.BodyCollider != null ? enemy.BodyCollider.bounds.extents.x : 0f);
+                if (((Vector2)enemy.transform.position - origin).sqrMagnitude > radius * radius)
+                {
+                    continue;
+                }
+
+                _dashHitEnemies.Add(enemy);
+                superpowers.ApplyDashHit(enemy.Health, origin, _dashDamage * _dashDamageMultiplier, effects);
             }
         }
 
@@ -201,7 +309,7 @@ namespace BattleForYourSoul.Player
                 _graceRemaining = 0f;
                 if (health != null)
                 {
-                    health.SetDamageImmune(false);
+                    health.RemoveDamageImmunity(this);
                 }
             }
             else
@@ -212,52 +320,21 @@ namespace BattleForYourSoul.Player
 
         private void IgnoreEnemyCollisions()
         {
-            if (bodyCollider == null || enemyRegistry == null)
+            if (bodyCollider != null && enemyRegistry != null)
             {
-                return;
-            }
-
-            IReadOnlyList<Enemy> enemies = enemyRegistry.Enemies;
-            for (int i = 0; i < enemies.Count; i++)
-            {
-                Enemy enemy = enemies[i];
-                if (enemy == null)
-                {
-                    continue;
-                }
-
-                Collider2D collider = enemy.BodyCollider;
-                if (collider == null || !collider.enabled)
-                {
-                    continue;
-                }
-
-                Physics2D.IgnoreCollision(bodyCollider, collider, true);
-                _ignoredColliders.Add(collider);
+                enemyRegistry.SuppressEnemyCollisions(this, bodyCollider);
             }
         }
 
         private void RestoreCollisions()
         {
-            if (bodyCollider == null)
+            if (bodyCollider != null && enemyRegistry != null)
             {
-                _ignoredColliders.Clear();
-                return;
+                enemyRegistry.RestoreEnemyCollisions(this, bodyCollider);
             }
-
-            for (int i = 0; i < _ignoredColliders.Count; i++)
-            {
-                Collider2D collider = _ignoredColliders[i];
-                if (collider != null)
-                {
-                    Physics2D.IgnoreCollision(bodyCollider, collider, false);
-                }
-            }
-
-            _ignoredColliders.Clear();
         }
 
-        /// <summary>Clears dash, cooldown and pass-through state, e.g. on a stage teleport.</summary>
+        /// <summary>Clears dash, charge, cooldown and pass-through state, e.g. on a stage teleport.</summary>
         private void Cancel()
         {
             if (_dashing)
@@ -268,8 +345,16 @@ namespace BattleForYourSoul.Player
                 {
                     _movement.EndDash();
                 }
+
+                if (posePlayer != null)
+                {
+                    posePlayer.Stop();
+                }
             }
 
+            _charging = false;
+            _chargeElapsed = 0f;
+            _dashHitEnemies.Clear();
             RestoreCollisions();
             _cooldownCharges = BaseCharges;
             _cooldownRemaining = 0f;
@@ -278,7 +363,7 @@ namespace BattleForYourSoul.Player
 
             if (health != null)
             {
-                health.SetDamageImmune(false);
+                health.RemoveDamageImmunity(this);
             }
         }
     }

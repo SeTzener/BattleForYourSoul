@@ -12,7 +12,13 @@ namespace BattleForYourSoul.Player
         /// <summary>Normalised movement intent (magnitude 0..1). Source-agnostic.</summary>
         Vector2 Move { get; }
 
+        /// <summary>True while the dash button is held. Used by Super Charge.</summary>
+        bool DashHeld { get; }
+
         /// <summary>Raised on the frame the dash button is pressed.</summary>
         event Action DashPressed;
+
+        /// <summary>Raised on the frame the dash button is released.</summary>
+        event Action DashReleased;
     }
 }

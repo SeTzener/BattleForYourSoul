@@ -13,6 +13,9 @@ namespace BattleForYourSoul.Enemies
         [SerializeField] private string displayName = "Grunt";
         [SerializeField] private Sprite sprite;
 
+        [Header("Rank")]
+        [SerializeField] private EnemyRank rank = EnemyRank.Foe;
+
         [Header("Stats")]
         [SerializeField, Min(1f)] private float maxHealth = 3f;
         [SerializeField, Min(0f)] private float moveSpeed = 2.2f;
@@ -32,6 +35,7 @@ namespace BattleForYourSoul.Enemies
         [SerializeField, Min(0.05f)] private float colliderRadius = 0.28f;
 
         public string DisplayName => displayName;
+        public EnemyRank Rank => rank;
         public Sprite Sprite => sprite;
         public float MaxHealth => maxHealth;
         public float MoveSpeed => moveSpeed;

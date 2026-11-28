@@ -18,7 +18,7 @@ MonoBehaviour:
   icon: {fileID: 21300000, guid: cb0e1573015674b47ae7be517766d75c, type: 3}
   color: {r: 0.5176471, g: 0.9254902, b: 0.8784314, a: 1}
   category: {fileID: 11400000, guid: 92574bd597f0f4081928ac7279fa3734, type: 2}
-  weaponFilter: []
+  superpowerFilter: []
   modifiers:
   - stat: 10
     value: 1

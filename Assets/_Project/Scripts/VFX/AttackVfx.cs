@@ -6,9 +6,9 @@ namespace BattleForYourSoul.VFX
     /// <summary>
     /// A pooled one-shot attack effect. Gameplay places it at the hit point; it scales, sweeps and
     /// fades for its lifetime, then returns itself to the pool. It owns no gameplay state and never
-    /// looks up who fired it, so any weapon can reuse the same prefab.
+    /// looks up who fired it, so any superpower can reuse the same prefab.
     ///
-    /// All values come from the firing <see cref="Weapons.WeaponActionDefinition"/>, so the actual
+    /// All values come from the firing <see cref="Superpowers.SuperpowerActionDefinition"/>, so the actual
     /// motion is authored data rather than a hard-coded animation.
     /// </summary>
     [DisallowMultipleComponent]
