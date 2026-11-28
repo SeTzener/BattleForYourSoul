@@ -50,10 +50,10 @@ MonoBehaviour:
         m_AdaptivePerformanceEnabled: 0
         m_BuildSubtarget: 0
         m_BuildSystem: 1
-        m_ExportAsGoogleAndroidProject: 1
+        m_ExportAsGoogleAndroidProject: 0
         m_DebugSymbolLevel: 1
         m_DebugSymbolFormat: 5
-        m_CurrentDeploymentTargetId: __builtin__target_default
+        m_CurrentDeploymentTargetId: QV721EXM50
         m_BuildType: 2
         m_LinkTimeOptimization: 0
         m_BuildAppBundle: 0
