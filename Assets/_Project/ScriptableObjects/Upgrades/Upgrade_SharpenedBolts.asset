@@ -17,7 +17,16 @@ MonoBehaviour:
   description: Increase projectile damage by 1.
   icon: {fileID: 21300000, guid: cb0e1573015674b47ae7be517766d75c, type: 3}
   color: {r: 0.9098039, g: 0.3764706, b: 0.3764706, a: 1}
+  source: 0
   category: {fileID: 11400000, guid: 958cfe07fe8704af8b792ef78930492f, type: 2}
+  superpowerFilter:
+  - {fileID: 11400000, guid: b98d8c68227f2404bb6cd337ec83aee4, type: 2}
+  maxStacks: 0
+  exclusiveGroup: 
+  requires: []
   modifiers:
   - stat: 0
     value: 1
+  behavior: 0
+  primaryOverride: {fileID: 0}
+  specialOverride: {fileID: 0}

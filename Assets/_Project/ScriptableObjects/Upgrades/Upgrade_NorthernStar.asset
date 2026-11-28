@@ -17,7 +17,8 @@ MonoBehaviour:
   description: Primary becomes a 3-hit combo. Each hit deals full damage; cooldown doubles with the animation.
   icon: {fileID: 21300000, guid: cb0e1573015674b47ae7be517766d75c, type: 3}
   color: {r: 0.7058824, g: 0.8784314, b: 0.9882353, a: 1}
-  category: {fileID: 11400000, guid: d70544f6364784605a2a611dd9c5f727, type: 2}
+  source: 1
+  category: {fileID: 11400000, guid: 4a2a6c754e92a4caaa1a24d21cd3014a, type: 2}
   superpowerFilter:
   - {fileID: 11400000, guid: 1c876ff785f544f3a90337781b0a9350, type: 2}
   maxStacks: 1

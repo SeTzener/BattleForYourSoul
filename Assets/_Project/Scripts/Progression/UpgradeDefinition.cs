@@ -43,6 +43,13 @@ namespace BattleForYourSoul.Progression
         SuperCharge,
     }
 
+    /// <summary>Where an upgrade may be offered. Level-up and stage-clear rewards never mix.</summary>
+    public enum UpgradeSource
+    {
+        LevelUp = 0,
+        StageClear = 1,
+    }
+
     /// <summary>Non-stat effects of a unique superpower upgrade.</summary>
     [Flags]
     public enum SuperpowerUpgradeBehavior
@@ -90,8 +97,12 @@ namespace BattleForYourSoul.Progression
         [Tooltip("Tint applied to the card icon.")]
         [SerializeField] private Color color = Color.white;
 
+        [Header("Offer source")]
+        [Tooltip("Level-up cards and stage-clear rewards are separate pools and never mix.")]
+        [SerializeField] private UpgradeSource source = UpgradeSource.LevelUp;
+
         [Header("Category")]
-        [Tooltip("Used by door-picked clear rewards. Uncategorised upgrades stay in normal level-ups.")]
+        [Tooltip("Optional stage-clear grouping. Level-ups ignore this field.")]
         [SerializeField] private UpgradeCategoryDefinition category;
 
         [Header("Superpower")]
@@ -124,6 +135,7 @@ namespace BattleForYourSoul.Progression
         public string Description => description;
         public Sprite Icon => icon;
         public Color Color => color;
+        public UpgradeSource Source => source;
         public UpgradeCategoryDefinition Category => category;
         public IReadOnlyList<StatModifier> Modifiers => modifiers;
         public int MaxStacks => Mathf.Max(0, maxStacks);

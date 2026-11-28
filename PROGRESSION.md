@@ -19,10 +19,12 @@ The game is a **Hades-style** action roguelite, not a Vampire-Survivors-style lo
 - Clear every enemy to unlock the exits; then **walk into a door** to advance.
 - Each door advertises the reward category that will be offered when the *next* room is cleared, so
   the exit is a choice about future build direction, not just a hallway. The three seeded door
-  categories are Shots, Mobility and Vitality. There is no Superpowers door; Superstrength upgrades
-  appear in the general level-up pool.
+  categories are **Upgrades**, Mobility and Vitality; only **Upgrades** currently has stage cards.
+- **Stage upgrades and level-up upgrades are separate pools.** `UpgradeDefinition.source` decides
+  where a card can appear, and the two sources never mix. The seven Superstrength uniques below are
+  stage-only; everything else remains a level-up card.
 - No XP pickups. Killing an enemy grants XP **directly**, scaled by the enemy's level.
-- Level-ups still happen and still offer an unfiltered choice of upgrades.
+- Level-ups still happen and offer a choice drawn only from the level-up source.
 
 Consequence: early rooms are weak and give low XP, so the player levels up slowly. Later rooms hit
 harder and pay more XP, while the door choice nudges which upgrades can appear at clear time.
@@ -71,8 +73,8 @@ harder and pay more XP, while the door choice nudges which upgrades can appear a
   `LevelUpController.QueueCategoryReward(pendingCategory)`. The controller then offers a **three-card
   choice filtered to that category**, with a title naming the category.
 - Category rewards and XP level-ups share one queue, so a category choice never interrupts a panel
-  that is already open. A category with fewer than three upgrades falls back to the full pool rather
-  than soft-locking the run.
+  that is already open. A category with fewer than three cards falls back to the rest of the **stage
+  source only**; it never pulls a level-up card into a stage reward.
 
 ### Samsara: superpower selection
 
@@ -143,9 +145,9 @@ new attack is possible by the time the last frame finishes.
 - **Level-ups** — hits have a separate 20%-per-card chance to stun for 0.25s, capped at **50%** for
   this superpower. The cap is enforced in `PlayerStats`, not on the asset. A stun is not the same as the
   guaranteed 0.3s `Foe` root; they can overlap.
-- **Unique Superstrength upgrades** — Charge, Super Charge, Power-up, Hulk, Man of Steel,
-  Northern Star Strike and Body Slam. They have no dedicated door; they roll in the general level-up
-  pool. "Unique" means **once per run**; the other level-up cards remain repeatable.
+- **Stage upgrades** — Charge, Super Charge, Power-up, Hulk, Man of Steel, Northern Star Strike and
+  Body Slam. They are **stage-clear only** and Superstrength-only. "Unique" means **once per run**;
+  level-up cards remain repeatable.
   Hulk and Man of Steel share the `superstrength-form` exclusive group, so they can never both be taken.
   Super Charge requires Charge.
 - **Charge** — dashing through a foe damages it once and knocks it back along the dash direction.
@@ -190,39 +192,48 @@ window is cancelled when the game is paused.
 3. When the live count reaches zero → `EnemySpawner.Cleared` → director unlocks doors and queues any
    pending category reward.
 4. Player walks into an unlocked door → director picks that category and advances the stage.
-5. When `Experience` crosses a threshold, `LevelUpController` pauses and offers an unfiltered upgrade
-   choice, queued behind any category reward.
+5. When `Experience` crosses a threshold, `LevelUpController` pauses and offers a choice from the
+   level-up source only, queued behind any category reward.
 
 No pickups, no pools for XP, no magnet radius. Samsara grants no XP; the flow above starts on the
 stage after the superpower is chosen.
 
 ## Upgrades
 
-Level-up choices are `UpgradeDefinition` assets carrying `StatModifier`s, gathered into an
-`UpgradePool` asset. Each upgrade may name a `category`; that is how a door-filtered clear choice is
-built. `PlayerStats` aggregates the chosen ones and pushes the result into `Health`,
-`SuperpowerController`, `PlayerMovement` and `PlayerDash`.
+All upgrades are `UpgradeDefinition` assets in `UpgradePool`. `UpgradeDefinition.source` is the hard
+split: `LevelUp` cards only appear on XP level-ups; `StageClear` cards only appear after clearing a
+room with a pending door category. `category` only groups stage cards; level-ups ignore it.
+`PlayerStats` aggregates chosen mods and pushes them into `Health`, `SuperpowerController`,
+`PlayerMovement` and `PlayerDash`.
 
-Seeded door categories: **Shots**, **Mobility** and **Vitality**. The `Superpowers` category asset is
-kept for authoring/filtering but has no door.
+Seeded door categories: **Upgrades**, Mobility and Vitality. Only **Upgrades** currently has authored
+stage cards; the other two remain placeholders and fall back to the same stage source rather than
+soft-locking the run.
 
-An upgrade can also carry a **superpower filter**. Global upgrades (mobility, vitality and the shared
-stats) have an empty filter and roll for every superpower. Superpower-specific effects only appear while the
-matching superpower is equipped, so a bow run never sees sword-only cards and vice versa. `PlayerStats`
-keeps one set of accumulated totals across superpower swaps inside Samsara, so trying a different superpower
-never loses an upgrade — but entering Samsara again clears everything (see above).
+An upgrade can also carry a **superpower filter**. Global upgrades (mobility and vitality) have an
+empty filter and roll for every superpower. Superpower-specific effects only appear while the matching
+superpower is equipped, so a bow run never sees sword-only cards and vice versa. All projectile cards —
+Sharpened Bolts, Rapid Fire, Split Shot and Velocity — are Bow-only, so Superstrength never gets a shot
+upgrade. `PlayerStats` keeps one set of accumulated totals across superpower swaps inside Samsara, so
+trying a different superpower never loses an upgrade — but entering Samsara again clears everything.
 
 `RunUpgradeState` records picks for the current run. `maxStacks: 1` makes an upgrade unique,
 `exclusiveGroup` makes a group mutually exclusive, and `requires` hides a card until its prerequisite
 is taken. `LevelUpController` filters with `CanOffer` and marks a pick **before** `PlayerStats.Apply`,
 so action overrides are visible on the same frame the card is chosen.
 
-Current upgrades: projectile damage, fire rate, move speed, instant dash charge, max health, extra
-projectile, projectile speed, plus superpower-filtered placeholders — sword reach/edge/impact, spear
-reach/broadhead/quick thrust, bow split/ricochet/impact. Ricochet and impact burst are implemented
-as inert-by-default effects: they do nothing until their upgrade is taken. Superstrength adds nine
-repeatable level-up cards (Strength, Heavy Fists, Swift Punch, Critical Chance, Critical Damage,
-Stun Chance, Toughness, Vigor, Firm Grip) and the seven unique Superstrength upgrades listed above.
+Current **level-up** upgrades:
+
+- Global: Fleet Footed, Swift Stride, Sure Footing, Phase Step, Vitality, Iron Will, Tough Skin.
+- Bow-only: Sharpened Bolts, Rapid Fire, Split Shot, Velocity, Split Arrow, Ricochet, Explosive Tip.
+- Sword-only: Longer Slash, Impact Wave, Keen Edge.
+- Spear-only: Long Reach, Broadhead, Quick Thrust.
+- Superstrength-only: Strength, Heavy Fists, Swift Punch, Critical Chance, Critical Damage, Stun
+  Chance, Toughness, Vigor, Firm Grip, plus the new tiered Strength-up Low/Mid/High, Critical Hit
+  Low/Mid/High and Critical Damage Low/Mid/High.
+
+Current **stage** upgrades: the seven Superstrength-only uniques listed above. Ricochet and impact
+burst remain inert-by-default effects: they do nothing until their upgrade is taken.
 
 ### Formulas and caps
 
@@ -286,8 +297,8 @@ Agreed choices that shape the design. Update this when a decision changes.
 - **Scaling shape**: linear per level for now. May become a curve asset.
 - **Enemy variety per stage**: stages already list placements of any enemy type and an authored
   `EnemyRank`; more ranks/types still to author.
-- **Category list**: Shots, Mobility and Vitality are the door categories; Superpowers is an
-  authoring-only category with no door. Final categories and their upgrades are still to be designed.
+- **Category list**: Upgrades, Mobility and Vitality are the door categories; Superpowers is an
+  authoring-only category. Only Upgrades has stage cards today; final categories remain to be designed.
 - **Superpowers**: sword/spear/bow and their six actions remain placeholders. Superstrength is the
   first real design but all its numbers are provisional. Its animation frames are crude stand-ins.
 - **Tune percentages/damage later**: every Superstrength value, the defense knee/cap, crit baseline,

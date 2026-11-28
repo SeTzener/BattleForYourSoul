@@ -14,7 +14,8 @@ namespace BattleForYourSoul.UI
     /// applies the picked one, and resumes. Level-ups and door-picked stage-clear rewards share one
     /// queue, so a category choice never interrupts an already-open panel.
     ///
-    /// A queued category filters the cards to upgrades in that category and updates the panel title.
+    /// XP level-ups and stage-clear rewards draw from separate <see cref="UpgradeSource"/> pools.
+    /// A queued category restricts the stage pool; it never pulls level-up cards into a stage reward.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LevelUpController : MonoBehaviour
@@ -149,8 +150,9 @@ namespace BattleForYourSoul.UI
             }
 
             UpgradeCategoryDefinition category = _queue.Dequeue();
+            UpgradeSource source = category != null ? UpgradeSource.StageClear : UpgradeSource.LevelUp;
             SuperpowerDefinition superpower = superpowerSelection != null ? superpowerSelection.SelectedSuperpower : null;
-            BuildChoices(category, superpower);
+            BuildChoices(category, source, superpower);
 
             if (_choices.Count == 0)
             {
@@ -164,14 +166,14 @@ namespace BattleForYourSoul.UI
             if (titleLabel != null)
             {
                 titleLabel.text = category != null
-                    ? $"{category.DisplayName.ToUpperInvariant()} UPGRADE"
+                    ? "STAGE UPGRADE"
                     : "LEVEL UP";
             }
 
             if (hintLabel != null)
             {
                 hintLabel.text = category != null
-                    ? $"Choose a {category.DisplayName} upgrade"
+                    ? $"Choose a stage upgrade ({category.DisplayName})"
                     : "Choose an upgrade";
             }
 
@@ -242,26 +244,20 @@ namespace BattleForYourSoul.UI
             }
         }
 
-        private void BuildChoices(UpgradeCategoryDefinition category, SuperpowerDefinition superpower)
+        private void BuildChoices(UpgradeCategoryDefinition category, UpgradeSource source, SuperpowerDefinition superpower)
         {
             _choices.Clear();
-            Collect(category, superpower, true);
+            Collect(source, category, superpower);
 
-            // A category with too few authored upgrades falls back to the rest of the pool, keeping the
-            // superpower filter so a bow never receives a sword upgrade.
-            if (_choices.Count == 0 && category != null)
+            // A door may advertise a category with no authored cards. Fall back inside the same
+            // source so a stage reward never spills into the level-up pool.
+            if (_choices.Count == 0 && source == UpgradeSource.StageClear)
             {
-                Collect(null, superpower, true);
-            }
-
-            // Last resort for an empty or misconfigured pool: offer anything rather than soft-lock.
-            if (_choices.Count == 0)
-            {
-                Collect(null, null, false);
+                Collect(source, null, superpower);
             }
         }
 
-        private void Collect(UpgradeCategoryDefinition category, SuperpowerDefinition superpower, bool filterBySuperpower)
+        private void Collect(UpgradeSource source, UpgradeCategoryDefinition category, SuperpowerDefinition superpower)
         {
             _scratch.Clear();
 
@@ -278,12 +274,17 @@ namespace BattleForYourSoul.UI
                     continue;
                 }
 
+                if (upgrade.Source != source)
+                {
+                    continue;
+                }
+
                 if (category != null && upgrade.Category != category)
                 {
                     continue;
                 }
 
-                if (filterBySuperpower && !upgrade.AppliesTo(superpower))
+                if (!upgrade.AppliesTo(superpower))
                 {
                     continue;
                 }

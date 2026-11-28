@@ -103,7 +103,7 @@ namespace BattleForYourSoul.EditorTools
 
             var categories = EnsureUpgradeCategories();
             UpgradeDefinition[] upgrades = EnsureUpgrades(
-                categories.shots, categories.mobility, categories.vitality, categories.superpowers, superpowers, actions, superstrengthIndex);
+                categories.upgrades, categories.mobility, categories.vitality, categories.superpowers, superpowers, actions, superstrengthIndex);
             UpgradePool upgradePool = EnsureUpgradePool(upgrades);
             StageDefinition[] stages = EnsureStages(enemyDefinition);
             StageProgression stageProgression = EnsureStageProgression(stages);
@@ -255,12 +255,14 @@ namespace BattleForYourSoul.EditorTools
             return settings;
         }
 
-        private static (UpgradeCategoryDefinition shots, UpgradeCategoryDefinition mobility, UpgradeCategoryDefinition vitality, UpgradeCategoryDefinition superpowers) EnsureUpgradeCategories()
+        private static (UpgradeCategoryDefinition upgrades, UpgradeCategoryDefinition mobility, UpgradeCategoryDefinition vitality, UpgradeCategoryDefinition superpowers) EnsureUpgradeCategories()
         {
             EnsureFolder(UpgradeCategoriesFolder);
 
+            // The former Shots door is now the generic stage-upgrade door. The other category assets
+            // stay wired as placeholders until more stage rewards are authored.
             return (
-                EnsureCategory("UpgradeCategory_Shots", "Shots", "Sharpen bolts and bend their flight.", new Color32(244, 152, 88, 255)),
+                EnsureCategory("UpgradeCategory_Upgrades", "Upgrades", "Unique stage upgrades for your superpower.", new Color32(244, 152, 88, 255)),
                 EnsureCategory("UpgradeCategory_Mobility", "Mobility", "Move faster and outmaneuver the room.", new Color32(112, 220, 156, 255)),
                 EnsureCategory("UpgradeCategory_Vitality", "Vitality", "Survive longer under pressure.", new Color32(236, 120, 160, 255)),
                 EnsureCategory("UpgradeCategory_Superpowers", "Superpowers", "Unique and powerful upgrades for your superpower.", new Color32(248, 214, 96, 255)));
@@ -981,7 +983,7 @@ namespace BattleForYourSoul.EditorTools
         }
 
         private static UpgradeDefinition[] EnsureUpgrades(
-            UpgradeCategoryDefinition shots,
+            UpgradeCategoryDefinition upgradesCategory,
             UpgradeCategoryDefinition mobility,
             UpgradeCategoryDefinition vitality,
             UpgradeCategoryDefinition superpowersCategory,
@@ -991,14 +993,16 @@ namespace BattleForYourSoul.EditorTools
         {
             EnsureFolder(UpgradesFolder);
             Sprite icon = LoadSprite(UpgradeIconSpritePath);
+            SuperpowerDefinition[] bow = superpowerFilter(superpowers, 2);
             SuperpowerDefinition[] strength = superpowerFilter(superpowers, superstrengthIndex);
 
             var upgrades = new[]
             {
-                EnsureUpgrade("Upgrade_SharpenedBolts", "sharpened-bolts", "Sharpened Bolts", "Increase projectile damage by 1.", new Color32(232, 96, 96, 255), icon, shots, UpgradeStat.DamageFlat, 1f),
-                EnsureUpgrade("Upgrade_RapidFire", "rapid-fire", "Rapid Fire", "Fire 12% faster.", new Color32(240, 168, 72, 255), icon, shots, UpgradeStat.FireRatePercent, 12f),
-                EnsureUpgrade("Upgrade_SplitShot", "split-shot", "Split Shot", "Fire one extra projectile.", new Color32(178, 130, 240, 255), icon, shots, UpgradeStat.ExtraProjectiles, 1f),
-                EnsureUpgrade("Upgrade_Velocity", "velocity", "Velocity", "Projectiles travel 15% faster.", new Color32(120, 210, 240, 255), icon, shots, UpgradeStat.ProjectileSpeedPercent, 15f),
+                // Projectile cards are Bow-only: other superpowers have nothing to shoot.
+                EnsureUpgrade("Upgrade_SharpenedBolts", "sharpened-bolts", "Sharpened Bolts", "Increase projectile damage by 1.", new Color32(232, 96, 96, 255), icon, upgradesCategory, UpgradeStat.DamageFlat, 1f, bow),
+                EnsureUpgrade("Upgrade_RapidFire", "rapid-fire", "Rapid Fire", "Fire 12% faster.", new Color32(240, 168, 72, 255), icon, upgradesCategory, UpgradeStat.FireRatePercent, 12f, bow),
+                EnsureUpgrade("Upgrade_SplitShot", "split-shot", "Split Shot", "Fire one extra projectile.", new Color32(178, 130, 240, 255), icon, upgradesCategory, UpgradeStat.ExtraProjectiles, 1f, bow),
+                EnsureUpgrade("Upgrade_Velocity", "velocity", "Velocity", "Projectiles travel 15% faster.", new Color32(120, 210, 240, 255), icon, upgradesCategory, UpgradeStat.ProjectileSpeedPercent, 15f, bow),
 
                 EnsureUpgrade("Upgrade_FleetFooted", "fleet-footed", "Fleet Footed", "Move 8% faster.", new Color32(120, 214, 120, 255), icon, mobility, UpgradeStat.MoveSpeedPercent, 8f),
                 EnsureUpgrade("Upgrade_SwiftStride", "swift-stride", "Swift Stride", "Move 10% faster.", new Color32(128, 232, 180, 255), icon, mobility, UpgradeStat.MoveSpeedPercent, 10f),
@@ -1010,9 +1014,9 @@ namespace BattleForYourSoul.EditorTools
                 EnsureUpgrade("Upgrade_ToughSkin", "tough-skin", "Tough Skin", "Gain 12 max health.", new Color32(232, 160, 190, 255), icon, vitality, UpgradeStat.MaxHealthFlat, 12f),
 
                 // Superpower-specific placeholders: each superpower has three so a filtered choice stays full.
-                EnsureUpgrade("Upgrade_Bow_Split", "bow-split", "Split Arrow", "Fire one additional arrow.", new Color32(244, 176, 96, 255), icon, shots, UpgradeStat.ExtraProjectiles, 1f, superpowerFilter(superpowers,2)),
-                EnsureUpgrade("Upgrade_Bow_Ricochet", "bow-ricochet", "Ricochet", "Arrows bounce to one more target.", new Color32(252, 200, 120, 255), icon, shots, UpgradeStat.RicochetBounces, 1f, superpowerFilter(superpowers,2)),
-                EnsureUpgrade("Upgrade_Bow_Impact", "bow-impact", "Explosive Tip", "Hits burst in a small area.", new Color32(248, 148, 104, 255), icon, shots, UpgradeStat.ImpactRadius, 0.35f, superpowerFilter(superpowers,2)),
+                EnsureUpgrade("Upgrade_Bow_Split", "bow-split", "Split Arrow", "Fire one additional arrow.", new Color32(244, 176, 96, 255), icon, upgradesCategory, UpgradeStat.ExtraProjectiles, 1f, bow),
+                EnsureUpgrade("Upgrade_Bow_Ricochet", "bow-ricochet", "Ricochet", "Arrows bounce to one more target.", new Color32(252, 200, 120, 255), icon, upgradesCategory, UpgradeStat.RicochetBounces, 1f, bow),
+                EnsureUpgrade("Upgrade_Bow_Impact", "bow-impact", "Explosive Tip", "Hits burst in a small area.", new Color32(248, 148, 104, 255), icon, upgradesCategory, UpgradeStat.ImpactRadius, 0.35f, bow),
 
                 EnsureUpgrade("Upgrade_Sword_Reach", "sword-reach", "Longer Slash", "Sword attacks reach half a block further.", new Color32(212, 172, 236, 255), icon, vitality, UpgradeStat.RangeFlat, 0.5f, superpowerFilter(superpowers,0)),
                 EnsureUpgrade("Upgrade_Sword_Impact", "sword-impact", "Impact Wave", "Sword hits leave a small area of impact.", new Color32(228, 144, 220, 255), icon, vitality, UpgradeStat.ImpactRadius, 0.3f, superpowerFilter(superpowers,0)),
@@ -1033,13 +1037,27 @@ namespace BattleForYourSoul.EditorTools
                 EnsureUpgrade("Upgrade_SuperstrengthVigor", "superstrength-vigor", "Vigor", "Gain 20 max health.", new Color32(244, 184, 196, 255), icon, vitality, UpgradeStat.MaxHealthFlat, 20f, strength),
                 EnsureUpgrade("Upgrade_FirmGrip", "firm-grip", "Firm Grip", "Punches knock foes back further.", new Color32(196, 220, 252, 255), icon, mobility, UpgradeStat.ChargeKnockback, 2f, strength),
 
-                // Unique Superpower-door upgrades. Each is offered once per run; form upgrades share
-                // an exclusive group so Hulk and Man of Steel can never both be taken.
+                // Tiered Superstrength level-up cards. Unlike the stage-only uniques below, these
+                // are repeatable and never appear as stage-clear rewards.
+                EnsureUpgrade("Upgrade_StrengthUp_Low", "strength-up-low", "Strength-up Low", "Gain 1 Strength.", new Color32(240, 132, 96, 255), icon, superpowersCategory, UpgradeStat.Strength, 1f, strength),
+                EnsureUpgrade("Upgrade_StrengthUp_Mid", "strength-up-mid", "Strength-up Mid", "Gain 3 Strength.", new Color32(248, 156, 104, 255), icon, superpowersCategory, UpgradeStat.Strength, 3f, strength),
+                EnsureUpgrade("Upgrade_StrengthUp_High", "strength-up-high", "Strength-up High", "Gain 6 Strength.", new Color32(252, 196, 120, 255), icon, superpowersCategory, UpgradeStat.Strength, 6f, strength),
+
+                EnsureUpgrade("Upgrade_CriticalHit_Low", "critical-hit-low", "Critical Hit Low", "Gain 5% critical chance.", new Color32(252, 224, 132, 255), icon, superpowersCategory, UpgradeStat.CriticalChancePercent, 5f, strength),
+                EnsureUpgrade("Upgrade_CriticalHit_Mid", "critical-hit-mid", "Critical Hit Mid", "Gain 10% critical chance.", new Color32(252, 232, 148, 255), icon, superpowersCategory, UpgradeStat.CriticalChancePercent, 10f, strength),
+                EnsureUpgrade("Upgrade_CriticalHit_High", "critical-hit-high", "Critical Hit High", "Gain 15% critical chance.", new Color32(252, 240, 164, 255), icon, superpowersCategory, UpgradeStat.CriticalChancePercent, 15f, strength),
+
+                EnsureUpgrade("Upgrade_CriticalDamage_Low", "critical-damage-low", "Critical Damage Low", "Critical hits deal 10% more damage.", new Color32(252, 238, 164, 255), icon, superpowersCategory, UpgradeStat.CriticalDamagePercent, 10f, strength),
+                EnsureUpgrade("Upgrade_CriticalDamage_Mid", "critical-damage-mid", "Critical Damage Mid", "Critical hits deal 20% more damage.", new Color32(252, 242, 180, 255), icon, superpowersCategory, UpgradeStat.CriticalDamagePercent, 20f, strength),
+                EnsureUpgrade("Upgrade_CriticalDamage_High", "critical-damage-high", "Critical Damage High", "Critical hits deal 30% more damage.", new Color32(252, 246, 196, 255), icon, superpowersCategory, UpgradeStat.CriticalDamagePercent, 30f, strength),
+
+                // Stage-clear upgrades. Each is offered once per run and only after choosing
+                // Superstrength; form upgrades share a group so Hulk and Man of Steel never both appear.
                 EnsureRichUpgrade(new UpgradeSeed
                 {
                     FileName = "Upgrade_Charge", Id = "charge", DisplayName = "Charge",
                     Description = "Dashing through a foe damages and knocks it back.",
-                    Color = new Color32(168, 236, 224, 255), Icon = icon, Category = superpowersCategory,
+                    Color = new Color32(168, 236, 224, 255), Icon = icon, Source = UpgradeSource.StageClear, Category = upgradesCategory,
                     SuperpowerFilter = strength, MaxStacks = 1,
                     Modifiers = new[]
                     {
@@ -1052,7 +1070,7 @@ namespace BattleForYourSoul.EditorTools
                 {
                     FileName = "Upgrade_SuperCharge", Id = "super-charge", DisplayName = "Super Charge",
                     Description = "Hold Dash up to 2s to charge up to double damage; release to fire. A tap matches Charge.",
-                    Color = new Color32(128, 244, 236, 255), Icon = icon, Category = superpowersCategory,
+                    Color = new Color32(128, 244, 236, 255), Icon = icon, Source = UpgradeSource.StageClear, Category = upgradesCategory,
                     SuperpowerFilter = strength, MaxStacks = 1,
                     Modifiers = new[] { new StatModifier(UpgradeStat.SuperCharge, 2f) },
                     Behavior = SuperpowerUpgradeBehavior.SuperCharge,
@@ -1062,7 +1080,7 @@ namespace BattleForYourSoul.EditorTools
                 {
                     FileName = "Upgrade_PowerUp", Id = "power-up", DisplayName = "Power-up",
                     Description = "All damage increased by 20%.",
-                    Color = new Color32(248, 132, 112, 255), Icon = icon, Category = superpowersCategory,
+                    Color = new Color32(248, 132, 112, 255), Icon = icon, Source = UpgradeSource.StageClear, Category = upgradesCategory,
                     SuperpowerFilter = strength, MaxStacks = 1,
                     Modifiers = new[] { new StatModifier(UpgradeStat.DamagePercent, 20f) },
                     Behavior = SuperpowerUpgradeBehavior.PowerUp,
@@ -1071,7 +1089,7 @@ namespace BattleForYourSoul.EditorTools
                 {
                     FileName = "Upgrade_Hulk", Id = "hulk", DisplayName = "Hulk",
                     Description = "Lower health grows stronger and greener. Exclusive with Man of Steel.",
-                    Color = new Color32(112, 220, 120, 255), Icon = icon, Category = superpowersCategory,
+                    Color = new Color32(112, 220, 120, 255), Icon = icon, Source = UpgradeSource.StageClear, Category = upgradesCategory,
                     SuperpowerFilter = strength, MaxStacks = 1, ExclusiveGroup = "superstrength-form",
                     Modifiers = new[]
                     {
@@ -1084,7 +1102,7 @@ namespace BattleForYourSoul.EditorTools
                 {
                     FileName = "Upgrade_ManOfSteel", Id = "man-of-steel", DisplayName = "Man of Steel",
                     Description = "Lower health grows denser and steelier. Exclusive with Hulk.",
-                    Color = new Color32(184, 204, 228, 255), Icon = icon, Category = superpowersCategory,
+                    Color = new Color32(184, 204, 228, 255), Icon = icon, Source = UpgradeSource.StageClear, Category = upgradesCategory,
                     SuperpowerFilter = strength, MaxStacks = 1, ExclusiveGroup = "superstrength-form",
                     Modifiers = new[] { new StatModifier(UpgradeStat.DefenseFlat, 30f) },
                     Behavior = SuperpowerUpgradeBehavior.ManOfSteel,
@@ -1093,7 +1111,7 @@ namespace BattleForYourSoul.EditorTools
                 {
                     FileName = "Upgrade_NorthernStar", Id = "northern-star-strike", DisplayName = "Northern Star Strike",
                     Description = "Primary becomes a 3-hit combo. Each hit deals full damage; cooldown doubles with the animation.",
-                    Color = new Color32(180, 224, 252, 255), Icon = icon, Category = superpowersCategory,
+                    Color = new Color32(180, 224, 252, 255), Icon = icon, Source = UpgradeSource.StageClear, Category = upgradesCategory,
                     SuperpowerFilter = strength, MaxStacks = 1,
                     PrimaryOverride = actions.NorthernStar,
                 }),
@@ -1101,7 +1119,7 @@ namespace BattleForYourSoul.EditorTools
                 {
                     FileName = "Upgrade_BodySlam", Id = "body-slam", DisplayName = "Body Slam",
                     Description = "Uppercut becomes a leaping slam. The jump is sprite animation only.",
-                    Color = new Color32(240, 184, 132, 255), Icon = icon, Category = superpowersCategory,
+                    Color = new Color32(240, 184, 132, 255), Icon = icon, Source = UpgradeSource.StageClear, Category = upgradesCategory,
                     SuperpowerFilter = strength, MaxStacks = 1,
                     SpecialOverride = actions.BodySlam,
                 }),
@@ -1128,6 +1146,7 @@ namespace BattleForYourSoul.EditorTools
             public string Description;
             public Color32 Color;
             public Sprite Icon;
+            public UpgradeSource Source;
             public UpgradeCategoryDefinition Category;
             public SuperpowerDefinition[] SuperpowerFilter;
             public StatModifier[] Modifiers;
@@ -1144,12 +1163,12 @@ namespace BattleForYourSoul.EditorTools
             string path = $"{UpgradesFolder}/{seed.FileName}.asset";
             var (upgrade, created) = EnsureAsset<UpgradeDefinition>(path);
 
-            SeedReferenceIfMissing(upgrade, "category", seed.Category);
             if (!created)
             {
                 // Stale generated assets can predate uniqueness, prerequisites, overrides or effect
                 // metadata. Backfill only empty/default fields; authored non-default values win.
                 var backfill = new SerializedObject(upgrade);
+                backfill.FindProperty("category").objectReferenceValue = seed.Category;
                 SeedStringIfEmpty(backfill.FindProperty("id"), seed.Id);
                 SeedStringIfEmpty(backfill.FindProperty("displayName"), seed.DisplayName);
                 SeedStringIfEmpty(backfill.FindProperty("description"), seed.Description);
@@ -1165,6 +1184,12 @@ namespace BattleForYourSoul.EditorTools
                 if (behavior.intValue == 0 && seed.Behavior != 0)
                 {
                     behavior.intValue = (int)seed.Behavior;
+                }
+
+                SerializedProperty source = backfill.FindProperty("source");
+                if (source.intValue == (int)UpgradeSource.LevelUp && seed.Source != UpgradeSource.LevelUp)
+                {
+                    source.intValue = (int)seed.Source;
                 }
 
                 SerializedProperty filter = backfill.FindProperty("superpowerFilter");
@@ -1206,9 +1231,11 @@ namespace BattleForYourSoul.EditorTools
             serialized.FindProperty("description").stringValue = seed.Description;
             serialized.FindProperty("color").colorValue = seed.Color;
             serialized.FindProperty("icon").objectReferenceValue = seed.Icon;
+            serialized.FindProperty("category").objectReferenceValue = seed.Category;
             serialized.FindProperty("maxStacks").intValue = seed.MaxStacks;
             serialized.FindProperty("exclusiveGroup").stringValue = seed.ExclusiveGroup ?? "";
             serialized.FindProperty("behavior").intValue = (int)seed.Behavior;
+            serialized.FindProperty("source").intValue = (int)seed.Source;
 
             SerializedProperty modifiers = serialized.FindProperty("modifiers");
             modifiers.arraySize = seed.Modifiers != null ? seed.Modifiers.Length : 0;
@@ -1824,7 +1851,7 @@ namespace BattleForYourSoul.EditorTools
         private static StageDoor[] BuildDoors(
             Transform parent,
             GameSettings settings,
-            (UpgradeCategoryDefinition shots, UpgradeCategoryDefinition mobility, UpgradeCategoryDefinition vitality, UpgradeCategoryDefinition superpowers) categories,
+            (UpgradeCategoryDefinition upgrades, UpgradeCategoryDefinition mobility, UpgradeCategoryDefinition vitality, UpgradeCategoryDefinition superpowers) categories,
             LevelDirector director)
         {
             Sprite closedSprite = LoadSprite(DoorClosedSpritePath);
@@ -1836,10 +1863,10 @@ namespace BattleForYourSoul.EditorTools
                 openSprite = LoadSprite(DoorOpenSpritePath);
             }
 
-            // No dedicated Superpowers door: those upgrades stay in the general level-up pool.
+            // All doors can grant a stage upgrade; only the Upgrades door is authored today.
             var offers = new[]
             {
-                categories.shots,
+                categories.upgrades,
                 categories.mobility,
                 categories.vitality,
             };

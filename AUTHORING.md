@@ -65,7 +65,7 @@ These were established with the first milestones and apply to every new system:
 | Stage order / end behaviour | `StageProgression_Default.asset` | Ordered stage list, loop-vs-escalate |
 | Doors, room entrance, superpower pedestals | `GameSettings.asset` | `roomEntrance`, `doorPositions`, `superpowerPedestalPositions` (shared by all stages) |
 | Which upgrades can appear | `UpgradePool_Default.asset` | List of upgrade assets |
-| One upgrade | `Upgrades/*.asset` | Name, icon, colour, category, **superpower filter**, stat modifiers |
+| One upgrade | `Upgrades/*.asset` | Name, icon, colour, **source** (`LevelUp` / `StageClear`), category, superpower filter, stat modifiers |
 | Door/reward category | `UpgradeCategories/*.asset` | Display name, colour, description |
 | Rendering (PPU, resolution, iso, sorting) | `GameSettings.asset` | Read by the camera, grid and import pipeline |
 
@@ -187,17 +187,19 @@ The builder seeds ten actions and four superpowers; edit those assets rather tha
 ## Categories and upgrades
 
 Doors advertise one `UpgradeCategoryDefinition` each. The category chosen at a door becomes the
-**filtered clear reward** for the next stage: when that stage is cleared, `LevelUpController` shows a
-three-card choice drawn only from upgrades in that category. Normal XP level-ups stay unfiltered and
-queue alongside it.
+**filtered clear reward** for the next stage. `UpgradeDefinition.source` keeps the two reward pools
+separate: `StageClear` cards never appear on XP level-ups, and `LevelUp` cards never appear as door
+rewards. A category with too few cards falls back to the rest of the **stage source only**.
 
 - Each category should have **at least three upgrades** in `UpgradePool_Default` so its filter can
   fill a three-card choice.
-- The three door categories are **Shots**, **Mobility** and **Vitality**; edit their assets to rename,
-  recolour or describe them. All three doors are active in Samsara. The `Superpowers` category asset is
-  retained for authoring/filtering but is not offered at a door.
-- To add an upgrade: duplicate an asset under `Upgrades/`, set its modifiers and category, then add it
-  to the pool. Percent stats are whole numbers (12 = +12%).
+- The three door categories are **Upgrades**, Mobility and Vitality; edit their assets to rename,
+  recolour or describe them. Only **Upgrades** has authored stage cards today. The `Shots` and
+  `Superpowers` category assets are retained as placeholders and are not offered at a door.
+- To add an upgrade: duplicate an asset under `Upgrades/`, set its **source**, modifiers and category,
+  then add it to the pool. Percent stats are whole numbers (12 = +12%).
+- Projectile upgrades are Bow-only. Do not leave a shot card unfiltered or Superstrength will be
+  offered upgrades for attacks it does not have.
 - `InstantDashCharges` grants dash charges that are **always ready**, independent of the normal
   cooldown. A granted charge is not consumed permanently: it refills whenever a dash ends, so one
   charge means one free dash is always available. The seeded **Phase Step** upgrade in the Mobility
